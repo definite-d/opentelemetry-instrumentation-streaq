@@ -1,0 +1,55 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "opentelemetry-instrumentation-streaq"
+dynamic = ["version"]
+description = "OpenTelemetry Streaq Instrumentation"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+  { name = "Afam-Ifediogor, U. Divine", email = "38317208+definite-d@users.noreply.github.com"}
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+  "opentelemetry-api ~= 1.12",
+  "opentelemetry-instrumentation == 0.63b0.dev",
+  "opentelemetry-semantic-conventions == 0.63b0.dev",
+]
+
+[project.optional-dependencies]
+instruments = [
+  "streaq >= 6.4.0, < 7.0",
+]
+
+[project.entry-points.opentelemetry_instrumentor]
+streaq = "opentelemetry.instrumentation.streaq:StreaqInstrumentor"
+
+[project.urls]
+Homepage = "https://github.com/definite-d/opentelemetry-instrumentation-streaq"
+Repository = "https://github.com/definite-d/opentelemetry-instrumentation-streaq"
+
+[tool.hatch.version]
+path = "src/opentelemetry/instrumentation/streaq/version.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/opentelemetry"]
