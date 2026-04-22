@@ -12,94 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import logging
-from typing import Any, Collection
+from collections.abc import Callable, Collection
+from contextvars import Token
+from datetime import datetime, timedelta
+from typing import Any
 
 import wrapt
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.instrumentation.utils import is_instrumentation_enabled, unwrap
 from opentelemetry.propagate import extract, inject
+from opentelemetry.trace import SpanKind, Tracer
 from opentelemetry.trace.status import Status, StatusCode
 
 from opentelemetry import context as context_api
 from opentelemetry import trace
+from opentelemetry.instrumentation.streaq.attributes import (
+    CompletionAttributes,
+    ConsumerAttributes,
+    ProducerAttributes,
+)
 from opentelemetry.instrumentation.streaq.package import _instruments
 from opentelemetry.instrumentation.streaq.utils import (
-    SpanAttributes,
     StreaqMetadataGetter,
     extract_metadata,
     inject_metadata,
-    set_span_attributes_from_task,
 )
 from opentelemetry.instrumentation.streaq.version import __version__
 
-logger = logging.getLogger(__name__)
-
-
-class _OpenTelemetryMiddleware:
-    def __init__(self, tracer: trace.Tracer):
-        self._tracer = tracer
-
-    def __call__(self, func):
-
-        async def wrapper(*args, **kwargs):
-            if not is_instrumentation_enabled():
-                return await func(*args, **kwargs)
-
-            # Extract trace context from kwargs
-            metadata = extract_metadata(kwargs)
-            parent_context = extract(metadata, getter=StreaqMetadataGetter())
-
-            # Attach parent context if present
-            token = None
-            if parent_context:
-                token = context_api.attach(parent_context)
-                logger.debug("Extracted trace context for task execution")
-
-            try:
-                # Get task info from context if available
-                task_context = kwargs.get("context")
-                task_name = getattr(task_context, "fn_name", func.__name__)
-                task_id = getattr(task_context, "task_id", "unknown")
-                queue_name = "default"
-                retry_count = getattr(task_context, "tries", 0)
-
-                # Create consumer span with parent context
-                with self._tracer.start_as_current_span(
-                    f"{task_name} process",
-                    context=parent_context,
-                    kind=trace.SpanKind.CONSUMER,
-                ) as span:
-                    # Set span attributes
-                    set_span_attributes_from_task(
-                        span,
-                        task_name=task_name,
-                        task_id=task_id,
-                        queue_name=queue_name,
-                        retry_count=retry_count,
-                    )
-                    span.set_attribute(SpanAttributes.MESSAGING_OPERATION, "process")
-
-                    try:
-                        result = await func(*args, **kwargs)
-                        return result
-                    except Exception as exc:
-                        if span.is_recording():
-                            span.set_status(Status(StatusCode.ERROR, str(exc)))
-                            span.record_exception(exc)
-                        raise
-            finally:
-                if token is not None:
-                    context_api.detach(token)
-
-        return wrapper
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class StreaqInstrumentor(BaseInstrumentor):
-    _instance = None
-    _patched = False
+    _instance: "StreaqInstrumentor | None" = None
+    _patched: bool = False
+    _tracer: Tracer | None = None
 
-    def __new__(cls):
+    def __new__(cls) -> "StreaqInstrumentor":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -108,14 +59,8 @@ class StreaqInstrumentor(BaseInstrumentor):
         return _instruments
 
     def _instrument(self, **kwargs: Any) -> None:
-        """Enable instrumentation for streaQ.
+        tracer_provider: Any = kwargs.get("tracer_provider")
 
-        Args:
-            tracer_provider: Optional custom tracer provider
-        """
-        tracer_provider = kwargs.get("tracer_provider")
-
-        # pylint: disable=attribute-defined-outside-init
         self._tracer = trace.get_tracer(
             __name__,
             __version__,
@@ -139,19 +84,15 @@ class StreaqInstrumentor(BaseInstrumentor):
             logger.warning("streaq not found, instrumentation will not work")
             return
 
-        # Patch enqueue methods (producer side)
         wrapt.wrap_function_wrapper(
             AsyncRegisteredTask, "enqueue", self._enqueue_wrapper
         )
         wrapt.wrap_function_wrapper(
             SyncRegisteredTask, "enqueue", self._enqueue_wrapper
         )
-
-        # Patch Worker.__init__ to auto-add middleware (consumer side)
-        wrapt.wrap_function_wrapper(Worker, "__init__", self._worker_init_wrapper)
+        wrapt.wrap_function_wrapper(Worker, "run_task", self._run_task_wrapper)
 
         self._patched = True
-        logger.debug("streaQ instrumentation patched")
 
     def _unpatch_streaq(self) -> None:
         if not self._patched:
@@ -163,56 +104,190 @@ class StreaqInstrumentor(BaseInstrumentor):
         except ImportError:
             return
 
-        # Use OpenTelemetry's unwrap utility to restore originals
         unwrap(AsyncRegisteredTask, "enqueue")
         unwrap(SyncRegisteredTask, "enqueue")
-        unwrap(Worker, "__init__")
+        unwrap(Worker, "run_task")
 
         self._patched = False
-        logger.debug("streaQ instrumentation unpatched")
 
-    def _worker_init_wrapper(self, wrapped, instance, args, kwargs):
-        result = wrapped(*args, **kwargs)
+    @staticmethod
+    def _to_ms(val: Any) -> int | None:
+        if val is None:
+            return None
+        if isinstance(val, timedelta):
+            return int(val.total_seconds() * 1000)
+        return int(float(val) * 1000)
 
-        already_added = any(
-            isinstance(m, _OpenTelemetryMiddleware) for m in instance.middlewares
+    @staticmethod
+    def _timestamp_ms_to_iso(ms: Any) -> str:
+        if not ms:
+            return "unknown"
+        return datetime.fromtimestamp(float(ms) / 1000.0).isoformat()
+
+    def _set_producer_attributes(
+        self,
+        span: trace.Span,
+        instance: Any,
+        task: Any,
+        destination: str,
+        priority: str,
+    ) -> None:
+        task_schedule: Any = getattr(task, "schedule", None)
+        crontab: str | None = getattr(instance, "crontab", None)
+        scheduled_time: str | None = None
+
+        if isinstance(task_schedule, str):
+            crontab = task_schedule
+        elif isinstance(task_schedule, datetime):
+            scheduled_time = task_schedule.isoformat()
+
+        ProducerAttributes(
+            destination=destination,
+            task_id=str(getattr(task, "id", "unknown")),
+            task_function=str(getattr(instance, "fn_name", "unknown")),
+            task_priority=str(priority),
+            max_retries=getattr(instance, "max_tries", None),
+            timeout_ms=self._to_ms(getattr(instance, "timeout", None)),
+            ttl_ms=self._to_ms(getattr(instance, "ttl", None)),
+            delay_ms=self._to_ms(getattr(task, "delay", None)),
+            expire_ms=self._to_ms(getattr(instance, "expire", None)),
+            unique=getattr(instance, "unique", None),
+            dependencies=getattr(task, "after", None),
+            crontab=crontab,
+            scheduled_time=scheduled_time,
+        ).set(span)
+
+    def _set_consumer_attributes(
+        self, span: trace.Span, worker: Any, msg: Any, destination: str, priority: str
+    ) -> None:
+        priorities: list[str] = getattr(worker, "priorities", [])
+        priorities_str: str = ",".join(reversed(priorities)) if priorities else ""
+        enqueue_time_iso: str = self._timestamp_ms_to_iso(
+            getattr(msg, "enqueue_time", None)
         )
-        if not already_added:
-            middleware = _OpenTelemetryMiddleware(tracer=self._tracer)
-            instance.middlewares.append(middleware)
-            logger.debug("Added OpenTelemetry middleware to Worker")
 
-        return result
+        ConsumerAttributes(
+            destination=destination,
+            message_id=str(getattr(msg, "message_id", "unknown")),
+            client_id=str(getattr(worker, "id", "unknown")),
+            consumer_id=str(getattr(worker, "id", "unknown")),
+            worker_concurrency=getattr(worker, "concurrency", 1),
+            worker_priorities=priorities_str,
+            task_id=str(getattr(msg, "task_id", "unknown")),
+            task_function=str(
+                getattr(msg, "fn_name", getattr(msg, "task_name", "unknown"))
+            ),
+            task_priority=str(priority),
+            retry_count=getattr(msg, "tries", 0),
+            enqueue_time=enqueue_time_iso,
+            worker_sync_concurrency=getattr(worker, "sync_concurrency", None),
+        ).set(span)
 
-    def _enqueue_wrapper(self, wrapped, instance, args, kwargs):
-        if not is_instrumentation_enabled():
+    def _set_completion_attributes(
+        self, span: trace.Span, msg: Any, result: Any
+    ) -> None:
+        start_time: float | int | None = getattr(result, "start_time", None)
+        finish_time: float | int | None = getattr(result, "finish_time", None)
+
+        duration: float | int = 0
+        if start_time is not None and finish_time is not None:
+            duration = finish_time - start_time
+
+        CompletionAttributes(
+            success=bool(getattr(result, "success", True)),
+            execution_duration_ms=int(duration),
+            start_time=self._timestamp_ms_to_iso(start_time),
+            finish_time=self._timestamp_ms_to_iso(finish_time),
+            enqueue_time=self._timestamp_ms_to_iso(
+                getattr(result, "enqueue_time", getattr(msg, "enqueue_time", None))
+            ),
+            result_ttl=self._to_ms(getattr(result, "ttl", None)),
+        ).set(span)
+
+    def _enqueue_wrapper(
+        self,
+        wrapped: Callable[..., Any],
+        instance: Any,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> Any:
+        if not is_instrumentation_enabled() or self._tracer is None:
             return wrapped(*args, **kwargs)
 
-        task_name = getattr(instance, "fn_name", str(wrapped))
-        queue_name = getattr(instance.worker, "queue_name", "default")
+        task: Any = wrapped(*args, **kwargs)
+        if task is None:
+            return task
+
+        worker: Any = getattr(instance, "worker", None)
+        queue_name: str = getattr(worker, "queue_name", "default")
+
+        priority: str | None = getattr(task, "priority", None)
+        if not priority and hasattr(worker, "priorities") and worker.priorities:
+            priority = worker.priorities[-1]
+        priority = priority or "default"
+
+        destination: str = f"{queue_name}:{priority}"
 
         with self._tracer.start_as_current_span(
-            f"{task_name} publish",
-            kind=trace.SpanKind.PRODUCER,
+            f"{destination} publish",
+            kind=SpanKind.PRODUCER,
         ) as span:
-            set_span_attributes_from_task(
-                span,
-                task_name=task_name,
-                task_id="pending",
-                queue_name=queue_name,
-            )
-            span.set_attribute(SpanAttributes.MESSAGING_OPERATION, "publish")
+            self._set_producer_attributes(span, instance, task, destination, priority)
 
-            result = wrapped(*args, **kwargs)
-
-            if result is not None and hasattr(result, "kwargs"):
+            if hasattr(task, "kwargs"):
+                if task.kwargs is None:
+                    task.kwargs = {}
                 carrier: dict[str, str] = {}
                 inject(carrier)
-                inject_metadata(result.kwargs, carrier)
-                logger.debug("Injected trace context into task %s", task_name)
+                inject_metadata(task.kwargs, carrier)
 
-                task_id = getattr(result, "id", None)
-                if task_id and span.is_recording():
-                    span.set_attribute(SpanAttributes.MESSAGING_MESSAGE_ID, task_id)
+        return task
 
-            return result
+    def _run_task_wrapper(
+        self,
+        wrapped: Callable[..., Any],
+        instance: Any,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> Any:
+        if not is_instrumentation_enabled() or self._tracer is None:
+            return wrapped(*args, **kwargs)
+
+        msg: Any = kwargs.get("msg") or (args[0] if args else None)
+        if msg is None:
+            return wrapped(*args, **kwargs)
+
+        worker: Any = instance
+        priority: str = getattr(msg, "priority", "default")
+        destination: str = f"{getattr(worker, 'queue_name', 'default')}:{priority}"
+
+        carrier: dict[str, Any] = getattr(msg, "kwargs", {})
+        if not carrier and hasattr(msg, "data") and isinstance(msg.data, dict):
+            carrier = msg.data.get("kwargs", {})
+
+        metadata: dict[str, Any] = extract_metadata(carrier)
+        parent_context: context_api.Context | None = extract(
+            metadata, getter=StreaqMetadataGetter()
+        )
+        token: Token | None = (
+            context_api.attach(parent_context) if parent_context else None
+        )
+
+        with self._tracer.start_as_current_span(
+            f"{destination} process",
+            kind=SpanKind.CONSUMER,
+        ) as span:
+            self._set_consumer_attributes(span, worker, msg, destination, priority)
+
+            try:
+                result: Any = wrapped(*args, **kwargs)
+                span.set_status(Status(StatusCode.OK))
+
+                if result:
+                    self._set_completion_attributes(span, msg, result)
+
+                return result
+            except Exception as exc:
+                span.set_status(Status(StatusCode.ERROR, str(exc)))
+                span.record_exception(exc)
+                raise
