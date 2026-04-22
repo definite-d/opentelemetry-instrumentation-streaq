@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import logging
 from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.instrumentation.streaq.version import __version__
+
+
+logger = logging.getLogger(__name__)
 
 class StreaqInstrumentor(BaseInstrumentor):
 
@@ -49,6 +52,7 @@ class StreaqInstrumentor(BaseInstrumentor):
         try:
             from streaq.task import Task
         except ImportError:
+            logger.warning("streaq.Task not found, instrumentation may not work")
             return
         
         self._patched = True
