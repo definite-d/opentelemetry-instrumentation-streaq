@@ -12,13 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+from typing import Any
+
+from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
+from opentelemetry.instrumentation.streaq.version import __version__
 
 class StreaqInstrumentor(BaseInstrumentor):
-    
+
     _instance = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
+
+    def _instrument(self, **kwargs: Any):
+        tracer_provider = kwargs.get("tracer_provider")
+
+        # pylint: disable=attribute-defined-outside-init
+        self._tracer = trace.get_tracer(
+            __name__,
+            __version__,
+            tracer_provider,
+            schema_url="https://opentelemetry.io/schemas/1.11.0",
+        )
