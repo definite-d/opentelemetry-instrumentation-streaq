@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+from enum import Enum
 from typing import Any, Optional
 
 from opentelemetry.trace import Span
@@ -25,6 +26,21 @@ logger = logging.getLogger(__name__)
 
 # Key used to store/retrieve trace context metadata in task kwargs
 OTEL_METADATA_KEY = "_streaq_otel_metadata"
+
+
+class SpanAttributes(str, Enum):
+    """OpenTelemetry span attribute names for streaQ instrumentation."""
+
+    # Messaging system semantic conventions
+    MESSAGING_SYSTEM = "messaging.system"
+    MESSAGING_DESTINATION_NAME = "messaging.destination.name"
+    MESSAGING_MESSAGE_ID = "messaging.message.id"
+    MESSAGING_OPERATION = "messaging.operation"
+
+    # streaQ-specific attributes
+    STREAQ_TASK_NAME = "messaging.streaq.task_name"
+    STREAQ_RETRY_COUNT = "messaging.streaq.retry_count"
+    STREAQ_WORKER_NAME = "messaging.streaq.worker_name"
 
 
 def inject_metadata(task_kwargs: dict[str, Any], metadata: dict[str, str]) -> None:
@@ -62,12 +78,12 @@ def set_span_attributes_from_task(
         return
 
     # Messaging semantic conventions
-    span.set_attribute("messaging.system", "redis")
-    span.set_attribute("messaging.destination.name", queue_name)
-    span.set_attribute("messaging.message.id", task_id)
-    span.set_attribute("messaging.streaq.task_name", task_name)
+    span.set_attribute(SpanAttributes.MESSAGING_SYSTEM, "redis")
+    span.set_attribute(SpanAttributes.MESSAGING_DESTINATION_NAME, queue_name)
+    span.set_attribute(SpanAttributes.MESSAGING_MESSAGE_ID, task_id)
+    span.set_attribute(SpanAttributes.STREAQ_TASK_NAME, task_name)
 
     if worker_name is not None:
-        span.set_attribute("messaging.streaq.worker_name", worker_name)
+        span.set_attribute(SpanAttributes.STREAQ_WORKER_NAME, worker_name)
     if retry_count is not None:
-        span.set_attribute("messaging.streaq.retry_count", retry_count)
+        span.set_attribute(SpanAttributes.STREAQ_RETRY_COUNT, retry_count)
