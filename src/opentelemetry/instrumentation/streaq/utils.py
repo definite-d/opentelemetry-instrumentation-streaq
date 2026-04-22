@@ -20,12 +20,13 @@ import logging
 from enum import Enum
 from typing import Any, Optional
 
+from opentelemetry.propagators.textmap import Getter
 from opentelemetry.trace import Span
 
 logger = logging.getLogger(__name__)
 
 # Key used to store/retrieve trace context metadata in task kwargs
-OTEL_METADATA_KEY = "_streaq_otel_metadata"
+OTEL_METADATA_KEY = "__otel_metadata"
 
 
 class SpanAttributes(str, Enum):
@@ -55,6 +56,39 @@ def inject_metadata(task_kwargs: dict[str, Any], metadata: dict[str, str]) -> No
     """
     task_kwargs.setdefault(OTEL_METADATA_KEY, {})
     task_kwargs[OTEL_METADATA_KEY].update(metadata)
+
+
+def extract_metadata(task_kwargs: dict[str, Any]) -> dict[str, str]:
+    metadata = task_kwargs.pop(OTEL_METADATA_KEY, None)
+    if metadata is None:
+        return {}
+    if not isinstance(metadata, dict):
+        logger.debug("Invalid metadata type: %s", type(metadata))
+        return {}
+    return metadata
+
+
+class StreaqMetadataGetter(Getter[dict[str, str]]):
+    _instance: StreaqMetadataGetter | None = None
+
+    def __new__(cls) -> StreaqMetadataGetter:
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def get(self, carrier: dict[str, str] | None, key: str) -> list[str] | None:
+        if carrier is None or not isinstance(carrier, dict):
+            return None
+        value = carrier.get(key)
+        if value is None:
+            return None
+        return [str(value)]
+
+    def keys(self, carrier: dict[str, str] | None) -> list[str]:
+        if carrier is None or not isinstance(carrier, dict):
+            return []
+        return list(carrier.keys())
+
 
 def set_span_attributes_from_task(
     span: Span,
