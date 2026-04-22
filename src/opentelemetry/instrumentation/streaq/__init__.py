@@ -36,7 +36,7 @@ from opentelemetry.instrumentation.streaq.version import __version__
 logger = logging.getLogger(__name__)
 
 
-class OpenTelemetryMiddleware:
+class _OpenTelemetryMiddleware:
     def __init__(self, tracer: trace.Tracer):
         self._tracer = tracer
 
@@ -175,10 +175,10 @@ class StreaqInstrumentor(BaseInstrumentor):
         result = wrapped(*args, **kwargs)
 
         already_added = any(
-            isinstance(m, OpenTelemetryMiddleware) for m in instance.middlewares
+            isinstance(m, _OpenTelemetryMiddleware) for m in instance.middlewares
         )
         if not already_added:
-            middleware = OpenTelemetryMiddleware(tracer=self._tracer)
+            middleware = _OpenTelemetryMiddleware(tracer=self._tracer)
             instance.middlewares.append(middleware)
             logger.debug("Added OpenTelemetry middleware to Worker")
 
