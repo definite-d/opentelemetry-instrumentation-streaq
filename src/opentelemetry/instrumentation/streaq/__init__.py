@@ -25,6 +25,7 @@ from opentelemetry.instrumentation.streaq.package import _instruments
 from opentelemetry.instrumentation.streaq.utils import (
     inject_metadata,
     set_span_attributes_from_task,
+    SpanAttributes,
 )
 from opentelemetry.instrumentation.streaq.version import __version__
 
@@ -118,7 +119,7 @@ class StreaqInstrumentor(BaseInstrumentor):
                 task_id="pending",
                 queue_name=queue_name,
             )
-            span.set_attribute("messaging.operation", "publish")
+            span.set_attribute(SpanAttributes.MESSAGING_OPERATION, "publish")
 
             result = wrapped(*args, **kwargs)
 
@@ -130,6 +131,6 @@ class StreaqInstrumentor(BaseInstrumentor):
 
                 task_id = getattr(result, "id", None)
                 if task_id and span.is_recording():
-                    span.set_attribute("messaging.message.id", task_id)
+                    span.set_attribute(SpanAttributes.MESSAGING_MESSAGE_ID, task_id)
 
             return result
