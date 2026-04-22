@@ -22,6 +22,7 @@ from opentelemetry.instrumentation.streaq.version import __version__
 class StreaqInstrumentor(BaseInstrumentor):
 
     _instance = None
+    _patched = False
 
     def __new__(cls):
         if cls._instance is None:
@@ -38,3 +39,16 @@ class StreaqInstrumentor(BaseInstrumentor):
             tracer_provider,
             schema_url="https://opentelemetry.io/schemas/1.11.0",
         )
+
+        self._patch_streaq()
+
+    def _patch_streaq(self):
+        if self._patched:
+            return
+        
+        try:
+            from streaq.task import Task
+        except ImportError:
+            return
+        
+        self._patched = True
