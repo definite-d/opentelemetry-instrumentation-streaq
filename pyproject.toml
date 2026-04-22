@@ -29,6 +29,11 @@ dependencies = [
   "opentelemetry-instrumentation == 0.62b0",
   "opentelemetry-semantic-conventions == 0.62b0",
 ]
+[dependency-groups]
+dev = [
+    "streaq>=6.4.0",
+]
+
 
 [project.optional-dependencies]
 instruments = [
