@@ -11,6 +11,78 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Instrument `streaQ`_ to trace streaQ applications.
+
+.. _streaQ: https://pypi.org/project/streaq/
+
+Usage
+-----
+
+* Start Redis server (required by streaQ)
+
+.. code::
+
+    docker run -p 6379:6379 redis
+
+
+* Create a worker module (worker.py)
+
+.. code:: python
+
+    from streaq import Worker
+    from opentelemetry.instrumentation.streaq import StreaqInstrumentor
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+
+    # Instrument streaQ
+    tracer_provider = TracerProvider()
+    tracer_provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+    StreaqInstrumentor().instrument(tracer_provider=tracer_provider)
+
+    worker = Worker(redis_url="redis://localhost")
+
+    @worker.task
+    async def my_task(data: str) -> str:
+        return f"Processed: {data}"
+
+
+* Run the worker
+
+.. code::
+
+    streaq run worker:worker
+
+
+* Queue a task (script.py)
+
+.. code:: python
+
+    from anyio import run
+    from worker import worker, my_task
+
+    async def main():
+        async with worker:
+            await my_task.enqueue("hello")
+
+    run(main)
+
+
+Setting up tracing
+-------------------
+
+When tracing a streaQ worker, ensure instrumentation is initialized before
+the worker starts. This is typically done at module import time as shown above.
+
+The instrumentation automatically handles:
+
+- **Producer spans**: Created when tasks are enqueued
+- **Consumer spans**: Created when tasks are executed by workers
+- **Context propagation**: Trace context is propagated from producers to consumers
+
+API
+---
+"""
 
 from __future__ import annotations
 
@@ -46,6 +118,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class StreaqInstrumentor(BaseInstrumentor):
+    """Instrumentor for streaQ."""
+
     _instance: "StreaqInstrumentor | None" = None
     _patched: bool = False
     _tracer: Tracer | None = None
