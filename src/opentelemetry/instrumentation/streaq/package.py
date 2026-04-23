@@ -11,6 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Package metadata for streaQ instrumentation.
 
+This module defines the instrumentation dependencies, specifying the
+supported versions of the streaQ library.
+"""
 
 _instruments = ("streaq >= 6.4.0, < 7.0",)

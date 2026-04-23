@@ -11,15 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Utility functions for streaQ trace context propagation.
+
+Provides :class:`StreaqMetadataGetter` for extracting trace context from
+task kwargs, and :func:`inject_metadata`/:func:`extract_metadata` for
+context propagation between producers and consumers.
+"""
 
 from __future__ import annotations
 
 import logging
-from enum import Enum
 from typing import Any
 
 from opentelemetry.propagators.textmap import Getter
-from opentelemetry.trace import Span
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +47,25 @@ def inject_metadata(task_kwargs: dict[str, Any], metadata: dict[str, str]) -> No
 
 
 def extract_metadata(task_kwargs: dict[str, Any]) -> dict[str, str]:
+    """Extract trace context metadata from task kwargs.
+
+    This is the consumer-side function that retrieves and removes the trace
+    context from task kwargs that was previously injected by the producer.
+
+    The metadata is removed from kwargs after extraction to avoid carrying
+    it forward through subsequent operations.
+
+    Args:
+        task_kwargs: The kwargs dict from the task message, containing the
+            injected ``__otel_metadata``.
+
+    Returns:
+        Dictionary containing trace context fields (traceparent, tracestate),
+        or an empty dict if no metadata was found.
+
+    Example:
+        See module-level example in ``inject_metadata``.
+    """
     metadata = task_kwargs.pop(OTEL_METADATA_KEY, None)
     if metadata is None:
         return {}
@@ -52,6 +76,8 @@ def extract_metadata(task_kwargs: dict[str, Any]) -> dict[str, str]:
 
 
 class StreaqMetadataGetter(Getter[dict[str, str]]):
+    """Custom text map getter for streaQ task kwargs."""
+
     _instance: StreaqMetadataGetter | None = None
 
     def __new__(cls) -> StreaqMetadataGetter:
