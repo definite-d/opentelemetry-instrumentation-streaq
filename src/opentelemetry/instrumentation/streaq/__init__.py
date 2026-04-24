@@ -88,9 +88,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Collection
+from contextlib import contextmanager
 from contextvars import Token
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Iterator, Optional
 
 import wrapt
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
@@ -115,6 +116,20 @@ from opentelemetry.instrumentation.streaq.utils import (
 from opentelemetry.instrumentation.streaq.version import __version__
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _attached_context(
+    parent_context: Optional[context_api.Context],
+) -> Iterator[None]:
+    token: Optional[Token] = None
+    if parent_context is not None:
+        token = context_api.attach(parent_context)
+    try:
+        yield
+    finally:
+        if token is not None:
+            context_api.detach(token)
 
 
 class StreaqInstrumentor(BaseInstrumentor):
@@ -343,14 +358,16 @@ class StreaqInstrumentor(BaseInstrumentor):
         parent_context: context_api.Context | None = extract(
             metadata, getter=StreaqMetadataGetter()
         )
-        token: Token | None = (
-            context_api.attach(parent_context) if parent_context else None
-        )
 
-        with self._tracer.start_as_current_span(
-            f"{destination} process",
-            kind=SpanKind.CONSUMER,
-        ) as span:
+        with (
+            # Attach the parent context to the current context
+            _attached_context(parent_context),
+            # Start a new span with the parent context
+            self._tracer.start_as_current_span(
+                f"{destination} process",
+                kind=SpanKind.CONSUMER,
+            ) as span,
+        ):
             self._set_consumer_attributes(span, worker, msg, destination, priority)
 
             try:
