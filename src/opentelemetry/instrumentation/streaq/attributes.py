@@ -28,14 +28,7 @@ from typing import Annotated, Any, ClassVar, get_type_hints
 from opentelemetry.trace import Span
 
 AttributeType = (
-    str
-    | int
-    | float
-    | bool
-    | Sequence[str]
-    | Sequence[int]
-    | Sequence[float]
-    | Sequence[bool]
+    str | int | float | bool | Sequence[str] | Sequence[int] | Sequence[float] | Sequence[bool]
 )
 
 
@@ -169,9 +162,7 @@ class ConsumerAttributes(BaseAttributes):
     timeout_ms: Annotated[int | None, "streaq.task.timeout_ms"] = None
     """Timeout in milliseconds."""
 
-    worker_sync_concurrency: Annotated[int | None, "streaq.worker.sync_concurrency"] = (
-        None
-    )
+    worker_sync_concurrency: Annotated[int | None, "streaq.worker.sync_concurrency"] = None
     """Sync concurrency."""
 
 

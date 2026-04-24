@@ -18,15 +18,7 @@ import typing
 from collections.abc import Sequence
 from dataclasses import fields
 from types import NoneType, UnionType
-from typing import (
-    Annotated,
-    Any,
-    Sequence,
-    TypeGuard,
-    get_args,
-    get_origin,
-    get_type_hints,
-)
+from typing import Annotated, Any, Sequence, TypeGuard, get_args, get_origin, get_type_hints
 from unittest.mock import Mock, patch
 
 import pytest
@@ -55,10 +47,7 @@ class TestAttributeValueTypes:
         # 2. Handle Unions (e.g., int | None or str | int)
         origin = get_origin(t)
         if origin in (UnionType, typing.Union):
-            return all(
-                TestAttributeValueTypes._is_valid_attribute_type(arg)
-                for arg in get_args(t)
-            )
+            return all(TestAttributeValueTypes._is_valid_attribute_type(arg) for arg in get_args(t))
 
         # 3. Handle NoneType (allowed for optional attributes in BaseAttributes.set)
         if t is NoneType:

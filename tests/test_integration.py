@@ -34,6 +34,7 @@ class TestStreaqInstrumentation:
         self, instrumentor, mock_instance, mock_task, memory_exporter
     ):
         """Enqueue creates a producer span with correct attributes."""
+
         def mock_wrapped(*args, **kwargs):
             return mock_task
 
@@ -50,10 +51,9 @@ class TestStreaqInstrumentation:
         assert span.attributes["messaging.destination"] == "test_queue:default"
         assert span.attributes["streaq.task.function"] == "test_task"
 
-    def test_enqueue_injects_context(
-        self, instrumentor, mock_instance, mock_task
-    ):
+    def test_enqueue_injects_context(self, instrumentor, mock_instance, mock_task):
         """Enqueue injects trace context into task kwargs."""
+
         def mock_wrapped(*args, **kwargs):
             return mock_task
 
@@ -85,6 +85,7 @@ class TestConsumerSpan:
         self, instrumentor, mock_worker, mock_msg, memory_exporter
     ):
         """Consumer span is created on task execution."""
+
         def mock_wrapped(*args, **kwargs):
             return Mock(
                 success=True,
@@ -133,10 +134,9 @@ class TestConsumerSpan:
 class TestContextPropagation:
     """Test trace context propagation between producer and consumer."""
 
-    def test_trace_context_propagates(
-        self, instrumentor, mock_instance, mock_task
-    ):
+    def test_trace_context_propagates(self, instrumentor, mock_instance, mock_task):
         """Trace context is propagated from producer to consumer."""
+
         def mock_wrapped(*args, **kwargs):
             return mock_task
 
@@ -149,10 +149,9 @@ class TestContextPropagation:
 class TestErrorHandling:
     """Test error handling in instrumentation."""
 
-    def test_enqueue_with_none_task(
-        self, instrumentor, mock_instance_with_worker, memory_exporter
-    ):
+    def test_enqueue_with_none_task(self, instrumentor, mock_instance_with_worker, memory_exporter):
         """Enqueue with None task returns None without creating span."""
+
         def mock_wrapped(*args, **kwargs):
             return None
 
@@ -162,10 +161,9 @@ class TestErrorHandling:
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 0
 
-    def test_run_task_with_none_msg(
-        self, instrumentor, mock_worker, memory_exporter
-    ):
+    def test_run_task_with_none_msg(self, instrumentor, mock_worker, memory_exporter):
         """Run task with None msg returns result without creating span."""
+
         def mock_wrapped(*args, **kwargs):
             return "result"
 
