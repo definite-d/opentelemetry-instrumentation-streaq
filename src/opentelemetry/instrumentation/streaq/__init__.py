@@ -88,9 +88,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Collection
+from contextlib import contextmanager
 from contextvars import Token
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Iterator, Optional
 
 import wrapt
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
@@ -115,6 +116,20 @@ from opentelemetry.instrumentation.streaq.utils import (
 from opentelemetry.instrumentation.streaq.version import __version__
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _attached_context(
+    parent_context: Optional[context_api.Context],
+) -> Iterator[None]:
+    token: Optional[Token] = None
+    if parent_context is not None:
+        token = context_api.attach(parent_context)
+    try:
+        yield
+    finally:
+        if token is not None:
+            context_api.detach(token)
 
 
 class StreaqInstrumentor(BaseInstrumentor):
@@ -158,12 +173,8 @@ class StreaqInstrumentor(BaseInstrumentor):
             logger.warning("streaq not found, instrumentation will not work")
             return
 
-        wrapt.wrap_function_wrapper(
-            AsyncRegisteredTask, "enqueue", self._enqueue_wrapper
-        )
-        wrapt.wrap_function_wrapper(
-            SyncRegisteredTask, "enqueue", self._enqueue_wrapper
-        )
+        wrapt.wrap_function_wrapper(AsyncRegisteredTask, "enqueue", self._enqueue_wrapper)
+        wrapt.wrap_function_wrapper(SyncRegisteredTask, "enqueue", self._enqueue_wrapper)
         wrapt.wrap_function_wrapper(Worker, "run_task", self._run_task_wrapper)
 
         self._patched = True
@@ -236,9 +247,7 @@ class StreaqInstrumentor(BaseInstrumentor):
     ) -> None:
         priorities: list[str] = getattr(worker, "priorities", [])
         priorities_str: str = ",".join(reversed(priorities)) if priorities else ""
-        enqueue_time_iso: str = self._timestamp_ms_to_iso(
-            getattr(msg, "enqueue_time", None)
-        )
+        enqueue_time_iso: str = self._timestamp_ms_to_iso(getattr(msg, "enqueue_time", None))
 
         ConsumerAttributes(
             destination=destination,
@@ -248,18 +257,14 @@ class StreaqInstrumentor(BaseInstrumentor):
             worker_concurrency=getattr(worker, "concurrency", 1),
             worker_priorities=priorities_str,
             task_id=str(getattr(msg, "task_id", "unknown")),
-            task_function=str(
-                getattr(msg, "fn_name", getattr(msg, "task_name", "unknown"))
-            ),
+            task_function=str(getattr(msg, "fn_name", getattr(msg, "task_name", "unknown"))),
             task_priority=str(priority),
             retry_count=getattr(msg, "tries", 0),
             enqueue_time=enqueue_time_iso,
             worker_sync_concurrency=getattr(worker, "sync_concurrency", None),
         ).set(span)
 
-    def _set_completion_attributes(
-        self, span: trace.Span, msg: Any, result: Any
-    ) -> None:
+    def _set_completion_attributes(self, span: trace.Span, msg: Any, result: Any) -> None:
         start_time: float | int | None = getattr(result, "start_time", None)
         finish_time: float | int | None = getattr(result, "finish_time", None)
 
@@ -343,14 +348,16 @@ class StreaqInstrumentor(BaseInstrumentor):
         parent_context: context_api.Context | None = extract(
             metadata, getter=StreaqMetadataGetter()
         )
-        token: Token | None = (
-            context_api.attach(parent_context) if parent_context else None
-        )
 
-        with self._tracer.start_as_current_span(
-            f"{destination} process",
-            kind=SpanKind.CONSUMER,
-        ) as span:
+        with (
+            # Attach the parent context to the current context
+            _attached_context(parent_context),
+            # Start a new span with the parent context
+            self._tracer.start_as_current_span(
+                f"{destination} process",
+                kind=SpanKind.CONSUMER,
+            ) as span,
+        ):
             self._set_consumer_attributes(span, worker, msg, destination, priority)
 
             try:
