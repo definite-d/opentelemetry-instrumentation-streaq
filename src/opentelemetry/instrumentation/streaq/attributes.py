@@ -27,7 +27,7 @@ from typing import Annotated, Any, ClassVar, get_type_hints
 
 from opentelemetry.trace import Span
 
-AttributeValue = (
+AttributeType = (
     str
     | int
     | float
@@ -62,7 +62,7 @@ class BaseAttributes:
     def set(self, span: Span) -> None:
         """Set non-None attributes on span."""
         otel_map: dict[str, str] = self._get_otel_map()
-        attrs: dict[str, AttributeValue] = {}
+        attrs: dict[str, AttributeType] = {}
 
         for f in fields(self):
             val: Any = getattr(self, f.name)
