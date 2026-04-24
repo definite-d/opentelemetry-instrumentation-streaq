@@ -173,12 +173,8 @@ class StreaqInstrumentor(BaseInstrumentor):
             logger.warning("streaq not found, instrumentation will not work")
             return
 
-        wrapt.wrap_function_wrapper(
-            AsyncRegisteredTask, "enqueue", self._enqueue_wrapper
-        )
-        wrapt.wrap_function_wrapper(
-            SyncRegisteredTask, "enqueue", self._enqueue_wrapper
-        )
+        wrapt.wrap_function_wrapper(AsyncRegisteredTask, "enqueue", self._enqueue_wrapper)
+        wrapt.wrap_function_wrapper(SyncRegisteredTask, "enqueue", self._enqueue_wrapper)
         wrapt.wrap_function_wrapper(Worker, "run_task", self._run_task_wrapper)
 
         self._patched = True
@@ -251,9 +247,7 @@ class StreaqInstrumentor(BaseInstrumentor):
     ) -> None:
         priorities: list[str] = getattr(worker, "priorities", [])
         priorities_str: str = ",".join(reversed(priorities)) if priorities else ""
-        enqueue_time_iso: str = self._timestamp_ms_to_iso(
-            getattr(msg, "enqueue_time", None)
-        )
+        enqueue_time_iso: str = self._timestamp_ms_to_iso(getattr(msg, "enqueue_time", None))
 
         ConsumerAttributes(
             destination=destination,
@@ -263,18 +257,14 @@ class StreaqInstrumentor(BaseInstrumentor):
             worker_concurrency=getattr(worker, "concurrency", 1),
             worker_priorities=priorities_str,
             task_id=str(getattr(msg, "task_id", "unknown")),
-            task_function=str(
-                getattr(msg, "fn_name", getattr(msg, "task_name", "unknown"))
-            ),
+            task_function=str(getattr(msg, "fn_name", getattr(msg, "task_name", "unknown"))),
             task_priority=str(priority),
             retry_count=getattr(msg, "tries", 0),
             enqueue_time=enqueue_time_iso,
             worker_sync_concurrency=getattr(worker, "sync_concurrency", None),
         ).set(span)
 
-    def _set_completion_attributes(
-        self, span: trace.Span, msg: Any, result: Any
-    ) -> None:
+    def _set_completion_attributes(self, span: trace.Span, msg: Any, result: Any) -> None:
         start_time: float | int | None = getattr(result, "start_time", None)
         finish_time: float | int | None = getattr(result, "finish_time", None)
 

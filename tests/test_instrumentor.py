@@ -27,6 +27,7 @@ class TestProducerSpanCreation:
         self, instrumentor, mock_instance, mock_task, memory_exporter
     ):
         """Enqueue creates a producer span with correct attributes."""
+
         def mock_wrapped(*args, **kwargs):
             return mock_task
 
@@ -43,10 +44,9 @@ class TestProducerSpanCreation:
         assert span.attributes["messaging.destination"] == "test_queue:default"
         assert span.attributes["streaq.task.function"] == "test_task"
 
-    def test_enqueue_injects_context(
-        self, instrumentor, mock_instance, mock_task
-    ):
+    def test_enqueue_injects_context(self, instrumentor, mock_instance, mock_task):
         """Enqueue injects trace context into task kwargs."""
+
         def mock_wrapped(*args, **kwargs):
             return mock_task
 
