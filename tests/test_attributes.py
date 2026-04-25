@@ -97,7 +97,7 @@ class TestBaseAttributes:
 
         assert mapping["operation"] == "messaging.operation"
         assert mapping["system"] == "messaging.system"
-        assert mapping["destination"] == "messaging.destination"
+        assert mapping["destination"] == "messaging.destination.name"
 
     def test_get_otel_map_uses_field_name_without_metadata(self):
         """_get_otel_map uses field name when no Annotated metadata."""
@@ -133,7 +133,7 @@ class TestBaseAttributes:
         assert len(spans) == 1
         set_attrs = spans[0].attributes or {}
 
-        assert "messaging.destination" in set_attrs
+        assert "messaging.destination.name" in set_attrs
         assert "streaq.task.id" in set_attrs
         assert "streaq.task.function" in set_attrs
 
@@ -219,7 +219,7 @@ class TestProducerAttributes:
         span_attrs = spans[0].attributes or {}
         assert span_attrs["messaging.operation"] == "publish"
         assert span_attrs["messaging.system"] == "redis"
-        assert span_attrs["messaging.destination"] == "test_queue:default"
+        assert span_attrs["messaging.destination.name"] == "test_queue:default"
         assert span_attrs["streaq.task.id"] == "task-uuid"
         assert span_attrs["streaq.task.function"] == "process_data"
         assert span_attrs["streaq.task.priority"] == "default"
@@ -296,7 +296,7 @@ class TestConsumerAttributes:
         span_attrs = spans[0].attributes or {}
         assert span_attrs["messaging.operation"] == "process"
         assert span_attrs["messaging.system"] == "redis"
-        assert span_attrs["messaging.destination"] == "test_queue:default"
+        assert span_attrs["messaging.destination.name"] == "test_queue:default"
         assert span_attrs["messaging.message.id"] == "msg-abc"
         assert span_attrs["messaging.consumer.id"] == "consumer-1"
         assert span_attrs["streaq.worker.concurrency"] == 8
