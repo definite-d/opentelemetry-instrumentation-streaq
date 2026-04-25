@@ -193,7 +193,7 @@ class StreaqInstrumentor(BaseInstrumentor):
 
     def _set_producer_attributes(self, span: trace.Span, task: Any, destination: str, priority: str) -> None:
         # Extract parent attributes (not available on Task)
-        parent: Any = getattr(task, "parent", None)
+        parent: Any = task.parent
         crontab: str | None = None
         delay_ms: int | None = self._to_ms(getattr(task, "delay", None))
         dependencies: list[str] | None = getattr(task, "after", None)
