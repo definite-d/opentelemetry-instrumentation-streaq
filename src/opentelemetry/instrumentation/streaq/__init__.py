@@ -135,14 +135,8 @@ def _attached_context(
 class StreaqInstrumentor(BaseInstrumentor):
     """Instrumentor for streaQ."""
 
-    _instance: StreaqInstrumentor | None = None
     _patched: bool = False
     _tracer: Tracer | None = None
-
-    def __new__(cls) -> StreaqInstrumentor:
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
 
     def instrumentation_dependencies(self) -> Collection[str]:
         return _instruments

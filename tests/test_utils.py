@@ -25,13 +25,7 @@ from opentelemetry.instrumentation.streaq.utils import (
 
 
 class TestStreaqMetadataGetter:
-    """Test the singleton StreaqMetadataGetter."""
-
-    def test_singleton_pattern(self):
-        """Getter should be a singleton."""
-        getter1 = StreaqMetadataGetter()
-        getter2 = StreaqMetadataGetter()
-        assert getter1 is getter2
+    """Test the StreaqMetadataGetter."""
 
     def test_get_from_dict(self):
         """Get values from dictionary carrier."""
