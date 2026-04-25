@@ -252,7 +252,6 @@ class StreaqInstrumentor(BaseInstrumentor):
         ConsumerAttributes(
             destination=destination,
             message_id=str(getattr(msg, "message_id", "unknown")),
-            client_id=str(getattr(worker, "id", "unknown")),
             consumer_id=str(getattr(worker, "id", "unknown")),
             worker_concurrency=getattr(worker, "concurrency", 1),
             worker_priorities=priorities_str,
