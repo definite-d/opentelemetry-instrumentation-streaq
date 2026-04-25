@@ -14,10 +14,7 @@
 
 """Tests for streaq instrumentation utilities."""
 
-from datetime import datetime, timedelta
-
 import pytest
-from opentelemetry.trace import Span
 
 from opentelemetry.instrumentation.streaq.utils import (
     OTEL_METADATA_KEY,

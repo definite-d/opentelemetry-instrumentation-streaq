@@ -87,11 +87,11 @@ API
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Iterator
 from contextlib import contextmanager
 from contextvars import Token
 from datetime import datetime, timedelta, timezone
-from typing import Any, Iterator, Optional
+from typing import Any, Optional
 
 import wrapt
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
@@ -120,9 +120,9 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 @contextmanager
 def _attached_context(
-    parent_context: Optional[context_api.Context],
+    parent_context: context_api.Context | None,
 ) -> Iterator[None]:
-    token: Optional[Token] = None
+    token: Token | None = None
     if parent_context is not None:
         token = context_api.attach(parent_context)
     try:
@@ -135,11 +135,11 @@ def _attached_context(
 class StreaqInstrumentor(BaseInstrumentor):
     """Instrumentor for streaQ."""
 
-    _instance: "StreaqInstrumentor | None" = None
+    _instance: StreaqInstrumentor | None = None
     _patched: bool = False
     _tracer: Tracer | None = None
 
-    def __new__(cls) -> "StreaqInstrumentor":
+    def __new__(cls) -> StreaqInstrumentor:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance

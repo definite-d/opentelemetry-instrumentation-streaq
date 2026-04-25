@@ -15,20 +15,16 @@
 """Tests for streaq instrumentation span attributes."""
 
 import typing
-from collections.abc import Sequence
 from dataclasses import fields
 from types import NoneType, UnionType
-from typing import Annotated, Any, Sequence, TypeGuard, get_args, get_origin, get_type_hints
-from unittest.mock import Mock, patch
+from typing import Annotated, Any, get_args, get_origin, get_type_hints
 
 import pytest
-from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from opentelemetry.instrumentation.streaq.attributes import (
     AttributeType,
-    BaseAttributes,
     CompletionAttributes,
     ConsumerAttributes,
     ProducerAttributes,

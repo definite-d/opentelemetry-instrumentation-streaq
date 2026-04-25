@@ -36,7 +36,7 @@ AttributeType = (
 class BaseAttributes:
     """Base class for span attributes."""
 
-    _key_cache: ClassVar[dict[type["BaseAttributes"], dict[str, str]]] = {}
+    _key_cache: ClassVar[dict[type[BaseAttributes], dict[str, str]]] = {}
 
     @classmethod
     def _get_otel_map(cls) -> dict[str, str]:

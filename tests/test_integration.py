@@ -23,7 +23,6 @@ from opentelemetry.semconv.attributes.exception_attributes import (
 )
 from opentelemetry.trace import SpanKind, StatusCode
 
-from opentelemetry.instrumentation.streaq import StreaqInstrumentor
 from opentelemetry.instrumentation.streaq.utils import OTEL_METADATA_KEY
 
 
