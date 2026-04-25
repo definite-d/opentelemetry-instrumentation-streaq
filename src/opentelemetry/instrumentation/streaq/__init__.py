@@ -322,7 +322,7 @@ class StreaqInstrumentor(BaseInstrumentor):
 
         return task
 
-    def _run_task_wrapper(
+    async def _run_task_wrapper(
         self,
         wrapped: Callable[..., Any],
         instance: Any,
@@ -330,11 +330,11 @@ class StreaqInstrumentor(BaseInstrumentor):
         kwargs: dict[str, Any],
     ) -> Any:
         if not is_instrumentation_enabled() or self._tracer is None:
-            return wrapped(*args, **kwargs)
+            return await wrapped(*args, **kwargs)
 
         msg: Any = kwargs.get("msg") or (args[0] if args else None)
         if msg is None:
-            return wrapped(*args, **kwargs)
+            return await wrapped(*args, **kwargs)
 
         worker: Any = instance
         priority: str = getattr(msg, "priority", "default")
@@ -361,7 +361,7 @@ class StreaqInstrumentor(BaseInstrumentor):
             self._set_consumer_attributes(span, worker, msg, destination, priority)
 
             try:
-                result: Any = wrapped(*args, **kwargs)
+                result: Any = await wrapped(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
 
                 if result:
