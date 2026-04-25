@@ -36,7 +36,7 @@ AttributeType = (
 class BaseAttributes:
     """Base class for span attributes."""
 
-    _key_cache: ClassVar[dict[type["BaseAttributes"], dict[str, str]]] = {}
+    _key_cache: ClassVar[dict[type[BaseAttributes], dict[str, str]]] = {}
 
     @classmethod
     def _get_otel_map(cls) -> dict[str, str]:
@@ -76,7 +76,7 @@ class ProducerAttributes(BaseAttributes):
     system: Annotated[str, "messaging.system"] = "redis"
     """Always ``"redis"``."""
 
-    destination: Annotated[str, "messaging.destination"]
+    destination: Annotated[str, "messaging.destination.name"]
     """Queue and priority (e.g., ``"queue:priority"``)."""
 
     task_id: Annotated[str, "streaq.task.id"]
@@ -126,14 +126,11 @@ class ConsumerAttributes(BaseAttributes):
     system: Annotated[str, "messaging.system"] = "redis"
     """Always ``"redis"``."""
 
-    destination: Annotated[str, "messaging.destination"]
+    destination: Annotated[str, "messaging.destination.name"]
     """Queue and priority."""
 
     message_id: Annotated[str, "messaging.message.id"]
     """Message identifier."""
-
-    client_id: Annotated[str, "messaging.client.id"]
-    """Worker client ID."""
 
     consumer_id: Annotated[str, "messaging.consumer.id"]
     """Worker consumer ID."""
@@ -156,7 +153,7 @@ class ConsumerAttributes(BaseAttributes):
     retry_count: Annotated[int, "streaq.task.retry_count"]
     """Retry attempt number."""
 
-    enqueue_time: Annotated[str, "streaq.task.enqueue_time"]
+    enqueue_time: Annotated[str | None, "streaq.task.enqueue_time"] = None
     """Enqueue timestamp."""
 
     timeout_ms: Annotated[int | None, "streaq.task.timeout_ms"] = None
@@ -176,13 +173,13 @@ class CompletionAttributes(BaseAttributes):
     execution_duration_ms: Annotated[int, "streaq.task.execution_duration_ms"]
     """Duration in milliseconds."""
 
-    start_time: Annotated[str, "streaq.task.start_time"]
+    start_time: Annotated[str | None, "streaq.task.start_time"] = None
     """Start timestamp."""
 
-    finish_time: Annotated[str, "streaq.task.finish_time"]
+    finish_time: Annotated[str | None, "streaq.task.finish_time"] = None
     """Finish timestamp."""
 
-    enqueue_time: Annotated[str, "streaq.task.enqueue_time"]
+    enqueue_time: Annotated[str | None, "streaq.task.enqueue_time"] = None
     """Enqueue timestamp."""
 
     result_ttl: Annotated[int | None, "streaq.task.result_ttl"] = None

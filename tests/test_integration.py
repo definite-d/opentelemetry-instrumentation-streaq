@@ -23,7 +23,6 @@ from opentelemetry.semconv.attributes.exception_attributes import (
 )
 from opentelemetry.trace import SpanKind, StatusCode
 
-from opentelemetry.instrumentation.streaq import StreaqInstrumentor
 from opentelemetry.instrumentation.streaq.utils import OTEL_METADATA_KEY
 
 
@@ -48,7 +47,7 @@ class TestStreaqInstrumentation:
         assert "publish" in span.name
         assert span.attributes["messaging.operation"] == "publish"
         assert span.attributes["messaging.system"] == "redis"
-        assert span.attributes["messaging.destination"] == "test_queue:default"
+        assert span.attributes["messaging.destination.name"] == "test_queue:default"
         assert span.attributes["streaq.task.function"] == "test_task"
 
     def test_enqueue_injects_context(self, instrumentor, mock_instance, mock_task):
@@ -81,7 +80,7 @@ class TestStreaqInstrumentation:
 class TestConsumerSpan:
     """Test consumer span creation and error handling."""
 
-    def test_consumer_span_on_task_execution(
+    async def test_consumer_span_on_task_execution(
         self, instrumentor, mock_worker, mock_msg, memory_exporter
     ):
         """Consumer span is created on task execution."""
@@ -95,7 +94,7 @@ class TestConsumerSpan:
                 ttl=None,
             )
 
-        instrumentor._run_task_wrapper(mock_wrapped, mock_worker, (), {"msg": mock_msg})
+        await instrumentor._run_task_wrapper(mock_wrapped, mock_worker, (), {"msg": mock_msg})
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -104,7 +103,7 @@ class TestConsumerSpan:
         assert span.kind == SpanKind.CONSUMER
         assert "process" in span.name
 
-    def test_consumer_span_records_exception(
+    async def test_consumer_span_records_exception(
         self, instrumentor, mock_worker, mock_msg, memory_exporter
     ):
         """Consumer span records exception details on failure."""
@@ -114,7 +113,7 @@ class TestConsumerSpan:
             raise ValueError("Task failed!")
 
         with pytest.raises(ValueError):
-            instrumentor._run_task_wrapper(mock_wrapped, mock_worker, (), {"msg": mock_msg})
+            await instrumentor._run_task_wrapper(mock_wrapped, mock_worker, (), {"msg": mock_msg})
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -149,25 +148,13 @@ class TestContextPropagation:
 class TestErrorHandling:
     """Test error handling in instrumentation."""
 
-    def test_enqueue_with_none_task(self, instrumentor, mock_instance_with_worker, memory_exporter):
-        """Enqueue with None task returns None without creating span."""
-
-        def mock_wrapped(*args, **kwargs):
-            return None
-
-        result = instrumentor._enqueue_wrapper(mock_wrapped, mock_instance_with_worker, (), {})
-
-        assert result is None
-        spans = memory_exporter.get_finished_spans()
-        assert len(spans) == 0
-
-    def test_run_task_with_none_msg(self, instrumentor, mock_worker, memory_exporter):
+    async def test_run_task_with_none_msg(self, instrumentor, mock_worker, memory_exporter):
         """Run task with None msg returns result without creating span."""
 
         def mock_wrapped(*args, **kwargs):
             return "result"
 
-        result = instrumentor._run_task_wrapper(mock_wrapped, mock_worker, (), {})
+        result = await instrumentor._run_task_wrapper(mock_wrapped, mock_worker, (), {})
 
         assert result == "result"
         spans = memory_exporter.get_finished_spans()
