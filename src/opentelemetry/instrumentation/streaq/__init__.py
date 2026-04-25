@@ -290,9 +290,9 @@ class StreaqInstrumentor(BaseInstrumentor):
             return wrapped(*args, **kwargs)
 
         task: Any = instance
-        worker: Any = getattr(task, "worker", None)
+        worker: Any = task.worker
         queue_name: str = getattr(worker, "queue_name", "default")
-        priority: str = getattr(task, "priority", None) or getattr(worker, "priorities", ["default"])[-1]
+        priority: str = getattr(task, "priority", None) or worker.priorities[0]
         destination: str = f"{queue_name}:{priority}"
 
         with self._tracer.start_as_current_span(
