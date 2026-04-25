@@ -91,7 +91,7 @@ from collections.abc import Callable, Collection, Iterator
 from contextlib import contextmanager
 from contextvars import Token
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any
 
 import wrapt
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
