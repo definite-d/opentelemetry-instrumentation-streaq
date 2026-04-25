@@ -76,7 +76,7 @@ class ProducerAttributes(BaseAttributes):
     system: Annotated[str, "messaging.system"] = "redis"
     """Always ``"redis"``."""
 
-    destination: Annotated[str, "messaging.destination"]
+    destination: Annotated[str, "messaging.destination.name"]
     """Queue and priority (e.g., ``"queue:priority"``)."""
 
     task_id: Annotated[str, "streaq.task.id"]
@@ -126,7 +126,7 @@ class ConsumerAttributes(BaseAttributes):
     system: Annotated[str, "messaging.system"] = "redis"
     """Always ``"redis"``."""
 
-    destination: Annotated[str, "messaging.destination"]
+    destination: Annotated[str, "messaging.destination.name"]
     """Queue and priority."""
 
     message_id: Annotated[str, "messaging.message.id"]
