@@ -153,7 +153,7 @@ class ConsumerAttributes(BaseAttributes):
     retry_count: Annotated[int, "streaq.task.retry_count"]
     """Retry attempt number."""
 
-    enqueue_time: Annotated[str, "streaq.task.enqueue_time"]
+    enqueue_time: Annotated[str | None, "streaq.task.enqueue_time"] = None
     """Enqueue timestamp."""
 
     timeout_ms: Annotated[int | None, "streaq.task.timeout_ms"] = None
@@ -173,13 +173,13 @@ class CompletionAttributes(BaseAttributes):
     execution_duration_ms: Annotated[int, "streaq.task.execution_duration_ms"]
     """Duration in milliseconds."""
 
-    start_time: Annotated[str, "streaq.task.start_time"]
+    start_time: Annotated[str | None, "streaq.task.start_time"] = None
     """Start timestamp."""
 
-    finish_time: Annotated[str, "streaq.task.finish_time"]
+    finish_time: Annotated[str | None, "streaq.task.finish_time"] = None
     """Finish timestamp."""
 
-    enqueue_time: Annotated[str, "streaq.task.enqueue_time"]
+    enqueue_time: Annotated[str | None, "streaq.task.enqueue_time"] = None
     """Enqueue timestamp."""
 
     result_ttl: Annotated[int | None, "streaq.task.result_ttl"] = None
