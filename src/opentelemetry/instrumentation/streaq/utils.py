@@ -78,13 +78,6 @@ def extract_metadata(task_kwargs: dict[str, Any]) -> dict[str, str]:
 class StreaqMetadataGetter(Getter[dict[str, str]]):
     """Custom text map getter for streaQ task kwargs."""
 
-    _instance: StreaqMetadataGetter | None = None
-
-    def __new__(cls) -> StreaqMetadataGetter:
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
     def get(self, carrier: dict[str, str] | None, key: str) -> list[str] | None:
         if carrier is None or not isinstance(carrier, dict):
             return None
