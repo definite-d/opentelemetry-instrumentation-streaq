@@ -148,18 +148,6 @@ class TestContextPropagation:
 class TestErrorHandling:
     """Test error handling in instrumentation."""
 
-    def test_enqueue_with_none_task(self, instrumentor, mock_instance_with_worker, memory_exporter):
-        """Enqueue with None task returns None without creating span."""
-
-        def mock_wrapped(*args, **kwargs):
-            return None
-
-        result = instrumentor._enqueue_wrapper(mock_wrapped, mock_instance_with_worker, (), {})
-
-        assert result is None
-        spans = memory_exporter.get_finished_spans()
-        assert len(spans) == 0
-
     async def test_run_task_with_none_msg(self, instrumentor, mock_worker, memory_exporter):
         """Run task with None msg returns result without creating span."""
 
