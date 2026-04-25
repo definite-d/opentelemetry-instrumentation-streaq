@@ -90,7 +90,7 @@ import logging
 from collections.abc import Callable, Collection
 from contextlib import contextmanager
 from contextvars import Token
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterator, Optional
 
 import wrapt
@@ -207,7 +207,7 @@ class StreaqInstrumentor(BaseInstrumentor):
     def _timestamp_ms_to_iso(ms: Any) -> str:
         if not ms:
             return "unknown"
-        return datetime.fromtimestamp(float(ms) / 1000.0).isoformat()
+        return datetime.fromtimestamp(float(ms) / 1000.0, tz=timezone.utc).isoformat()
 
     def _set_producer_attributes(
         self,
