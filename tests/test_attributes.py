@@ -240,7 +240,6 @@ class TestConsumerAttributes:
         attrs = ConsumerAttributes(
             destination="test_queue:default",
             message_id="msg-1",
-            client_id="worker-1",
             consumer_id="worker-1",
             worker_concurrency=4,
             worker_priorities="high,default",
@@ -259,7 +258,6 @@ class TestConsumerAttributes:
         attrs = ConsumerAttributes(
             destination="queue:default",
             message_id="msg-1",
-            client_id="worker-1",
             consumer_id="worker-1",
             worker_concurrency=1,
             worker_priorities="default",
@@ -278,7 +276,6 @@ class TestConsumerAttributes:
         attrs = ConsumerAttributes(
             destination="test_queue:default",
             message_id="msg-abc",
-            client_id="worker-1",
             consumer_id="consumer-1",
             worker_concurrency=8,
             worker_priorities="high,low",
@@ -305,7 +302,6 @@ class TestConsumerAttributes:
         assert span_attrs["messaging.system"] == "redis"
         assert span_attrs["messaging.destination"] == "test_queue:default"
         assert span_attrs["messaging.message.id"] == "msg-abc"
-        assert span_attrs["messaging.client.id"] == "worker-1"
         assert span_attrs["messaging.consumer.id"] == "consumer-1"
         assert span_attrs["streaq.worker.concurrency"] == 8
         assert span_attrs["streaq.worker.priorities"] == "high,low"

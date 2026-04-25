@@ -132,9 +132,6 @@ class ConsumerAttributes(BaseAttributes):
     message_id: Annotated[str, "messaging.message.id"]
     """Message identifier."""
 
-    client_id: Annotated[str, "messaging.client.id"]
-    """Worker client ID."""
-
     consumer_id: Annotated[str, "messaging.consumer.id"]
     """Worker consumer ID."""
 
