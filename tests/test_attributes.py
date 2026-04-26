@@ -116,10 +116,9 @@ class TestBaseAttributes:
     def test_set_filters_none_values(self, fresh_tracer_provider):
         """set filters out None values before setting on span."""
         attrs = ProducerAttributes(
-            destination="test_queue:default",
+            destination="normal",
             task_id="task-123",
             task_function="test_task",
-            task_priority="default",
         )
 
         exporter = InMemorySpanExporter()
@@ -143,10 +142,9 @@ class TestBaseAttributes:
     def test_set_calls_set_attributes_once(self, fresh_tracer_provider):
         """set calls span.set_attributes exactly once with all non-None attrs."""
         attrs = ProducerAttributes(
-            destination="queue:default",
+            destination="normal",
             task_id="abc",
             task_function="func",
-            task_priority="high",
             max_retries=3,
         )
 
@@ -167,10 +165,9 @@ class TestProducerAttributes:
     def test_default_values(self):
         """ProducerAttributes has correct default values."""
         attrs = ProducerAttributes(
-            destination="test_queue:default",
+            destination="normal",
             task_id="task-1",
             task_function="my_task",
-            task_priority="default",
         )
 
         assert attrs.operation == "publish"
@@ -179,10 +176,9 @@ class TestProducerAttributes:
     def test_all_optional_fields_none_by_default(self):
         """Optional fields default to None."""
         attrs = ProducerAttributes(
-            destination="queue:default",
-            task_id="task-1",
-            task_function="task",
-            task_priority="default",
+            destination="normal",
+            task_id="task-123",
+            task_function="test_task",
         )
 
         assert attrs.max_retries is None
@@ -198,10 +194,9 @@ class TestProducerAttributes:
     def test_set_producer_attributes_on_span(self, fresh_tracer_provider):
         """ProducerAttributes.set() sets all attributes on span."""
         attrs = ProducerAttributes(
-            destination="test_queue:default",
+            destination="normal",
             task_id="task-uuid",
             task_function="process_data",
-            task_priority="default",
             max_retries=5,
             timeout_ms=30000,
             ttl_ms=60000,
@@ -219,10 +214,9 @@ class TestProducerAttributes:
         span_attrs = spans[0].attributes or {}
         assert span_attrs["messaging.operation"] == "publish"
         assert span_attrs["messaging.system"] == "redis"
-        assert span_attrs["messaging.destination.name"] == "test_queue:default"
+        assert span_attrs["messaging.destination.name"] == "normal"
         assert span_attrs["streaq.task.id"] == "task-uuid"
         assert span_attrs["streaq.task.function"] == "process_data"
-        assert span_attrs["streaq.task.priority"] == "default"
         assert span_attrs["streaq.task.max_retries"] == 5
         assert span_attrs["streaq.task.timeout_ms"] == 30000
         assert span_attrs["streaq.task.ttl_ms"] == 60000
@@ -234,14 +228,13 @@ class TestConsumerAttributes:
     def test_default_values(self):
         """ConsumerAttributes has correct default values."""
         attrs = ConsumerAttributes(
-            destination="test_queue:default",
+            destination="normal",
             message_id="msg-1",
             consumer_id="worker-1",
             worker_concurrency=4,
-            worker_priorities="high,default",
+            worker_priorities="high,normal",
             task_id="task-123",
             task_function="test_fn",
-            task_priority="default",
             retry_count=0,
             enqueue_time="2024-01-01T00:00:00+00:00",
         )
@@ -252,14 +245,13 @@ class TestConsumerAttributes:
     def test_all_optional_fields_none_by_default(self):
         """Optional fields default to None."""
         attrs = ConsumerAttributes(
-            destination="queue:default",
+            destination="normal",
             message_id="msg-1",
             consumer_id="worker-1",
             worker_concurrency=1,
-            worker_priorities="default",
+            worker_priorities="normal",
             task_id="task-1",
             task_function="task",
-            task_priority="default",
             retry_count=0,
             enqueue_time="timestamp",
         )
@@ -270,14 +262,13 @@ class TestConsumerAttributes:
     def test_set_consumer_attributes_on_span(self, fresh_tracer_provider):
         """ConsumerAttributes.set() sets all attributes on span."""
         attrs = ConsumerAttributes(
-            destination="test_queue:default",
+            destination="normal",
             message_id="msg-abc",
             consumer_id="consumer-1",
             worker_concurrency=8,
-            worker_priorities="high,low",
+            worker_priorities="high,normal,low",
             task_id="task-xyz",
             task_function="handler_func",
-            task_priority="high",
             retry_count=2,
             enqueue_time="2024-06-15T10:30:00+00:00",
             timeout_ms=5000,
@@ -296,14 +287,13 @@ class TestConsumerAttributes:
         span_attrs = spans[0].attributes or {}
         assert span_attrs["messaging.operation"] == "process"
         assert span_attrs["messaging.system"] == "redis"
-        assert span_attrs["messaging.destination.name"] == "test_queue:default"
+        assert span_attrs["messaging.destination.name"] == "normal"
         assert span_attrs["messaging.message.id"] == "msg-abc"
         assert span_attrs["messaging.consumer.id"] == "consumer-1"
         assert span_attrs["streaq.worker.concurrency"] == 8
-        assert span_attrs["streaq.worker.priorities"] == "high,low"
+        assert span_attrs["streaq.worker.priorities"] == "high,normal,low"
         assert span_attrs["streaq.task.id"] == "task-xyz"
         assert span_attrs["streaq.task.function"] == "handler_func"
-        assert span_attrs["streaq.task.priority"] == "high"
         assert span_attrs["streaq.task.retry_count"] == 2
         assert span_attrs["streaq.task.enqueue_time"] == "2024-06-15T10:30:00+00:00"
         assert span_attrs["streaq.task.timeout_ms"] == 5000
