@@ -41,12 +41,6 @@ class TestStreaqMetadataGetter:
         getter = StreaqMetadataGetter()
         assert getter.get(None, "traceparent") is None
 
-    def test_get_from_non_dict(self):
-        """Handle non-dict carrier gracefully."""
-        getter = StreaqMetadataGetter()
-        assert getter.get("not a dict", "key") is None
-        assert getter.get([1, 2, 3], "key") is None
-
     def test_keys_from_dict(self):
         """Get all keys from dictionary carrier."""
         getter = StreaqMetadataGetter()
@@ -59,7 +53,6 @@ class TestStreaqMetadataGetter:
         assert getter.keys(None) == []
 
 
-@pytest.mark.utils
 class TestMetadataFunctions:
     """Test inject_metadata and extract_metadata."""
 

@@ -29,15 +29,15 @@ from opentelemetry.instrumentation.streaq.utils import OTEL_METADATA_KEY
 class TestStreaqInstrumentation:
     """Test streaq instrumentation integration."""
 
-    def test_enqueue_creates_producer_span(
+    async def test_enqueue_creates_producer_span(
         self, instrumentor, mock_instance, mock_task, memory_exporter
     ):
         """Enqueue creates a producer span with correct attributes."""
 
-        def mock_wrapped(*args, **kwargs):
+        async def mock_wrapped(*args, **kwargs):
             return mock_task
 
-        instrumentor._enqueue_wrapper(mock_wrapped, mock_instance, (), {})
+        await instrumentor._enqueue_wrapper(mock_wrapped, mock_instance, (), {})
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -47,31 +47,31 @@ class TestStreaqInstrumentation:
         assert "publish" in span.name
         assert span.attributes["messaging.operation"] == "publish"
         assert span.attributes["messaging.system"] == "redis"
-        assert span.attributes["messaging.destination.name"] == "test_queue:default"
+        assert span.attributes["messaging.destination.name"] == "test_queue:normal"
         assert span.attributes["streaq.task.function"] == "test_task"
 
-    def test_enqueue_injects_context(self, instrumentor, mock_instance, mock_task):
+    async def test_enqueue_injects_context(self, instrumentor, mock_instance, mock_task):
         """Enqueue injects trace context into task kwargs."""
 
-        def mock_wrapped(*args, **kwargs):
+        async def mock_wrapped(*args, **kwargs):
             return mock_task
 
-        instrumentor._enqueue_wrapper(mock_wrapped, mock_instance, (), {})
+        await instrumentor._enqueue_wrapper(mock_wrapped, mock_instance, (), {})
 
-        assert OTEL_METADATA_KEY in mock_task.kwargs
-        assert "traceparent" in mock_task.kwargs[OTEL_METADATA_KEY]
+        assert OTEL_METADATA_KEY in mock_instance.kwargs
+        assert "traceparent" in mock_instance.kwargs[OTEL_METADATA_KEY]
 
-    def test_uninstrument_removes_patches(
+    async def test_uninstrument_removes_patches(
         self, instrumentor, mock_instance, mock_task, memory_exporter
     ):
         """Uninstrument removes patches and stops tracing."""
         instrumentor.uninstrument()
 
-        def mock_wrapped(*args, **kwargs):
+        async def mock_wrapped(*args, **kwargs):
             return mock_task
 
         instrumentor._tracer = None
-        instrumentor._enqueue_wrapper(mock_wrapped, mock_instance, (), {})
+        await instrumentor._enqueue_wrapper(mock_wrapped, mock_instance, (), {})
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 0
@@ -85,7 +85,7 @@ class TestConsumerSpan:
     ):
         """Consumer span is created on task execution."""
 
-        def mock_wrapped(*args, **kwargs):
+        async def mock_wrapped(*args, **kwargs):
             return Mock(
                 success=True,
                 start_time=time.time(),
@@ -133,28 +133,29 @@ class TestConsumerSpan:
 class TestContextPropagation:
     """Test trace context propagation between producer and consumer."""
 
-    def test_trace_context_propagates(self, instrumentor, mock_instance, mock_task):
+    async def test_trace_context_propagates(self, instrumentor, mock_instance, mock_task):
         """Trace context is propagated from producer to consumer."""
 
-        def mock_wrapped(*args, **kwargs):
+        async def mock_wrapped(*args, **kwargs):
             return mock_task
 
-        instrumentor._enqueue_wrapper(mock_wrapped, mock_instance, (), {})
+        await instrumentor._enqueue_wrapper(mock_wrapped, mock_instance, (), {})
 
-        assert OTEL_METADATA_KEY in mock_task.kwargs
-        assert "traceparent" in mock_task.kwargs[OTEL_METADATA_KEY]
+        assert OTEL_METADATA_KEY in mock_instance.kwargs
+        assert "traceparent" in mock_instance.kwargs[OTEL_METADATA_KEY]
 
 
 class TestErrorHandling:
     """Test error handling in instrumentation."""
 
-    async def test_run_task_with_none_msg(self, instrumentor, mock_worker, memory_exporter):
-        """Run task with None msg returns result without creating span."""
+    async def test_run_task_without_tracer(self, instrumentor, mock_worker, memory_exporter):
+        """Run task without tracer returns result without creating span."""
 
-        def mock_wrapped(*args, **kwargs):
+        async def mock_wrapped(*args, **kwargs):
             return "result"
 
-        result = await instrumentor._run_task_wrapper(mock_wrapped, mock_worker, (), {})
+        instrumentor._tracer = None
+        result = await instrumentor._run_task_wrapper(mock_wrapped, mock_worker, (), {"msg": Mock()})
 
         assert result == "result"
         spans = memory_exporter.get_finished_spans()
