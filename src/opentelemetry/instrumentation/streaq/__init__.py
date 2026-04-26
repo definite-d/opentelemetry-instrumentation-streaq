@@ -326,7 +326,7 @@ class StreaqInstrumentor(BaseInstrumentor):
 
         msg: Any = kwargs.get("msg") or args[0]
         worker: Any = instance
-        priority: str = getattr(msg, "priority", "default")
+        priority: str = msg.priority
         destination: str = f"{worker.queue_name}:{priority}"
 
         carrier: dict[str, Any] = msg.kwargs
