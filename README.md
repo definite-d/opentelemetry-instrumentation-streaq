@@ -123,23 +123,22 @@ This ensures complete end-to-end tracing across the distributed task queue.
 
 These attributes are captured when tasks are enqueued:
 
-| Attribute                    | Type     | Description                                               |
-| ---------------------------- | -------- | --------------------------------------------------------- |
-| `messaging.system`           | string   | Always `"redis"`                                          |
-| `messaging.operation`        | string   | Always `"publish"`                                        |
-| `messaging.destination.name` | string   | The queue/priority combination (e.g., `"default:normal"`) |
-| `streaq.task.id`             | string   | Unique task identifier                                    |
-| `streaq.task.function`       | string   | Name of the task function                                 |
-| `streaq.task.priority`       | string   | Task priority level                                       |
-| `streaq.task.max_retries`    | int      | Maximum retry attempts (if configured)                    |
-| `streaq.task.timeout_ms`     | int      | Task timeout in milliseconds                              |
-| `streaq.task.ttl_ms`         | int      | Task TTL in milliseconds                                  |
-| `streaq.task.delay_ms`       | int      | Task delay in milliseconds                                |
-| `streaq.task.expire_ms`      | int      | Task expiration in milliseconds                           |
-| `streaq.task.unique`         | boolean  | Whether task is unique                                    |
-| `streaq.task.dependencies`   | string[] | Task dependencies (after)                                 |
-| `streaq.task.crontab`        | string   | Crontab schedule (if scheduled)                           |
-| `streaq.task.scheduled_time` | string   | Scheduled execution time (if delayed)                     |
+| Attribute                    | Type     | Description                            |
+| ---------------------------- | -------- | -------------------------------------- |
+| `messaging.system`           | string   | Always `"redis"`                       |
+| `messaging.operation`        | string   | Always `"publish"`                     |
+| `messaging.destination.name` | string   | The queue name (e.g., `"normal"`)      |
+| `streaq.task.id`             | string   | Unique task identifier                 |
+| `streaq.task.function`       | string   | Name of the task function              |
+| `streaq.task.max_retries`    | int      | Maximum retry attempts (if configured) |
+| `streaq.task.timeout_ms`     | int      | Task timeout in milliseconds           |
+| `streaq.task.ttl_ms`         | int      | Task TTL in milliseconds               |
+| `streaq.task.delay_ms`       | int      | Task delay in milliseconds             |
+| `streaq.task.expire_ms`      | int      | Task expiration in milliseconds        |
+| `streaq.task.unique`         | boolean  | Whether task is unique                 |
+| `streaq.task.dependencies`   | string[] | Task dependencies (after)              |
+| `streaq.task.crontab`        | string   | Crontab schedule (if scheduled)        |
+| `streaq.task.scheduled_time` | string   | Scheduled execution time (if delayed)  |
 
 ### Consumer Span Attributes
 
@@ -149,14 +148,13 @@ These attributes are captured when tasks are executed:
 | -------------------------------- | ------ | ---------------------------------------- |
 | `messaging.system`               | string | Always `"redis"`                         |
 | `messaging.operation`            | string | Always `"process"`                       |
-| `messaging.destination.name`     | string | The queue/priority combination           |
+| `messaging.destination.name`     | string | The queue name                           |
 | `messaging.message.id`           | string | The message identifier                   |
 | `messaging.consumer.id`          | string | Worker consumer identifier               |
 | `streaq.worker.concurrency`      | int    | Worker concurrency setting               |
 | `streaq.worker.priorities`       | string | Worker priority levels (comma-separated) |
 | `streaq.task.id`                 | string | Unique task identifier                   |
 | `streaq.task.function`           | string | Name of the task function                |
-| `streaq.task.priority`           | string | Task priority level                      |
 | `streaq.task.retry_count`        | int    | Current retry attempt                    |
 | `streaq.task.enqueue_time`       | string | When the task was enqueued (ISO format)  |
 | `streaq.task.timeout_ms`         | int    | Task timeout in milliseconds             |

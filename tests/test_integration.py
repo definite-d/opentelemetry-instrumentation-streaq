@@ -47,7 +47,7 @@ class TestStreaqInstrumentation:
         assert "publish" in span.name
         assert span.attributes["messaging.operation"] == "publish"
         assert span.attributes["messaging.system"] == "redis"
-        assert span.attributes["messaging.destination.name"] == "test_queue:normal"
+        assert span.attributes["messaging.destination.name"] == "normal"
         assert span.attributes["streaq.task.function"] == "test_task"
 
     async def test_enqueue_injects_context(self, instrumentor, mock_instance, mock_task):
