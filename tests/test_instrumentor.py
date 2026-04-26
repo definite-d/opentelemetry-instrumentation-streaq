@@ -16,7 +16,6 @@
 
 from opentelemetry.trace import SpanKind
 
-from opentelemetry.instrumentation.streaq import StreaqInstrumentor
 from opentelemetry.instrumentation.streaq.utils import OTEL_METADATA_KEY
 
 

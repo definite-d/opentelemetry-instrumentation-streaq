@@ -14,8 +14,6 @@
 
 """Tests for streaq instrumentation utilities."""
 
-import pytest
-
 from opentelemetry.instrumentation.streaq.utils import (
     OTEL_METADATA_KEY,
     StreaqMetadataGetter,
