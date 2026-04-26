@@ -191,7 +191,7 @@ class StreaqInstrumentor(BaseInstrumentor):
             return None
         return datetime.fromtimestamp(float(ms) / 1000.0, tz=timezone.utc).isoformat()
 
-    def _set_producer_attributes(self, span: trace.Span, task: Any, destination: str, priority: str) -> None:
+    def _set_producer_attributes(self, span: trace.Span, task: Any, destination: str) -> None:
         # Extract parent attributes (not available on Task)
         parent: Any = task.parent
         crontab: str | None = None
@@ -222,13 +222,14 @@ class StreaqInstrumentor(BaseInstrumentor):
             scheduled_time=scheduled_time,
             task_function=fn_name,
             task_id=task_id,
-            task_priority=str(priority),
             timeout_ms=timeout_ms,
             ttl_ms=ttl_ms,
             unique=unique,
         ).set(span)
 
-    def _set_consumer_attributes(self, span: trace.Span, worker: Any, msg: Any, destination: str, priority: str) -> None:
+    def _set_consumer_attributes(
+        self, span: trace.Span, worker: Any, msg: Any, destination: str
+    ) -> None:
         consumer_id: str = str(worker.id)
         enqueue_time_iso: str | None = self._timestamp_ms_to_iso(msg.enqueue_time)
         message_id: str = str(msg.message_id)
@@ -252,7 +253,6 @@ class StreaqInstrumentor(BaseInstrumentor):
             retry_count=msg.tries,
             task_function=task_function,
             task_id=task_id,
-            task_priority=str(priority),
             timeout_ms=timeout_ms,
             worker_concurrency=worker_concurrency,
             worker_priorities=priorities_str,
@@ -291,9 +291,7 @@ class StreaqInstrumentor(BaseInstrumentor):
 
         task: Any = instance
         worker: Any = task.worker
-        queue_name: str = worker.queue_name
-        priority: str = getattr(task, "priority", None) or worker.priorities[0]
-        destination: str = f"{queue_name}:{priority}"
+        destination: str = getattr(task, "priority", None) or worker.priorities[-1]
 
         with self._tracer.start_as_current_span(
             f"{destination} publish",
@@ -310,7 +308,7 @@ class StreaqInstrumentor(BaseInstrumentor):
             result: Any = await wrapped(*args, **kwargs)
 
             # Set producer attributes
-            self._set_producer_attributes(span, task, destination, priority)
+            self._set_producer_attributes(span, task, destination)
 
         return result
 
@@ -326,8 +324,7 @@ class StreaqInstrumentor(BaseInstrumentor):
 
         msg: Any = kwargs.get("msg") or args[0]
         worker: Any = instance
-        priority: str = msg.priority
-        destination: str = f"{worker.queue_name}:{priority}"
+        destination: str = msg.priority
 
         carrier: dict[str, Any] = msg.kwargs
 
@@ -345,7 +342,7 @@ class StreaqInstrumentor(BaseInstrumentor):
                 kind=SpanKind.CONSUMER,
             ) as span,
         ):
-            self._set_consumer_attributes(span, worker, msg, destination, priority)
+            self._set_consumer_attributes(span, worker, msg, destination)
 
             try:
                 result: Any = await wrapped(*args, **kwargs)

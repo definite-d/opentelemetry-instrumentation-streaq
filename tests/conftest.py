@@ -52,7 +52,6 @@ def instrumentor(tracer_provider):
 def mock_worker():
     """Create a mock worker object."""
     worker = Mock()
-    worker.queue_name = "test_queue"
     worker.name = "test_worker"
     worker.id = "worker-1"
     worker._redis = None
@@ -132,7 +131,6 @@ def mock_msg():
 def mock_instance_with_worker():
     """Create a mock instance with worker for error handling tests."""
     worker = Mock()
-    worker.queue_name = "test_queue"
     worker._redis = None
     worker.priorities = ["normal"]
 

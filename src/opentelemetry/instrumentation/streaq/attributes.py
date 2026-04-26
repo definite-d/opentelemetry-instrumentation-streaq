@@ -77,16 +77,13 @@ class ProducerAttributes(BaseAttributes):
     """Messaging system backend (currently always redis)."""
 
     destination: Annotated[str, "messaging.destination.name"]
-    """Queue and priority (e.g., ``"queue:priority"``)."""
+    """Queue name (in streaQ, priority is the queue name)."""
 
     task_id: Annotated[str, "streaq.task.id"]
     """Unique task identifier."""
 
     task_function: Annotated[str, "streaq.task.function"]
     """Task function name."""
-
-    task_priority: Annotated[str, "streaq.task.priority"]
-    """Task priority level."""
 
     max_retries: Annotated[int | None, "streaq.task.max_retries"] = None
     """Max retry attempts."""
@@ -127,7 +124,7 @@ class ConsumerAttributes(BaseAttributes):
     """Messaging system backend (currently always redis)."""
 
     destination: Annotated[str, "messaging.destination.name"]
-    """Queue and priority."""
+    """Queue name (in streaQ, priority is the queue name)."""
 
     message_id: Annotated[str, "messaging.message.id"]
     """Message identifier."""
@@ -139,16 +136,13 @@ class ConsumerAttributes(BaseAttributes):
     """Worker concurrency."""
 
     worker_priorities: Annotated[str, "streaq.worker.priorities"]
-    """Worker priorities."""
+    """Worker priorities (comma-separated list of available queue names)."""
 
     task_id: Annotated[str, "streaq.task.id"]
     """Task identifier."""
 
     task_function: Annotated[str, "streaq.task.function"]
     """Task function name."""
-
-    task_priority: Annotated[str, "streaq.task.priority"]
-    """Task priority."""
 
     retry_count: Annotated[int, "streaq.task.retry_count"]
     """Retry attempt number."""
