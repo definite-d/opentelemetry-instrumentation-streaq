@@ -227,7 +227,9 @@ class StreaqInstrumentor(BaseInstrumentor):
             unique=unique,
         ).set(span)
 
-    def _set_consumer_attributes(self, span: trace.Span, worker: Any, msg: Any, destination: str) -> None:
+    def _set_consumer_attributes(
+        self, span: trace.Span, worker: Any, msg: Any, destination: str
+    ) -> None:
         consumer_id: str = str(worker.id)
         enqueue_time_iso: str | None = self._timestamp_ms_to_iso(msg.enqueue_time)
         message_id: str = str(msg.message_id)

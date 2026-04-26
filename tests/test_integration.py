@@ -155,7 +155,9 @@ class TestErrorHandling:
             return "result"
 
         instrumentor._tracer = None
-        result = await instrumentor._run_task_wrapper(mock_wrapped, mock_worker, (), {"msg": Mock()})
+        result = await instrumentor._run_task_wrapper(
+            mock_wrapped, mock_worker, (), {"msg": Mock()}
+        )
 
         assert result == "result"
         spans = memory_exporter.get_finished_spans()
