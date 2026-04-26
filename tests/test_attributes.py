@@ -279,7 +279,7 @@ class TestConsumerAttributes:
             task_function="handler_func",
             task_priority="high",
             retry_count=2,
-            enqueue_time="2024-06-15T10:30:00",
+            enqueue_time="2024-06-15T10:30:00+00:00",
             timeout_ms=5000,
             worker_sync_concurrency=2,
         )
@@ -320,14 +320,12 @@ class TestCompletionAttributes:
             execution_duration_ms=1500,
             start_time="2024-01-01T10:00:00+00:00",
             finish_time="2024-01-01T10:00:01+00:00",
-            enqueue_time="2024-01-01T09:59:55+00:00",
         )
 
         assert attrs.success is True
         assert attrs.execution_duration_ms == 1500
         assert attrs.start_time == "2024-01-01T10:00:00+00:00"
         assert attrs.finish_time == "2024-01-01T10:00:01+00:00"
-        assert attrs.enqueue_time == "2024-01-01T09:59:55+00:00"
 
     def test_optional_result_ttl_none_by_default(self):
         """result_ttl defaults to None."""
@@ -336,7 +334,6 @@ class TestCompletionAttributes:
             execution_duration_ms=500,
             start_time="start",
             finish_time="finish",
-            enqueue_time="enqueue",
         )
 
         assert attrs.result_ttl is None
@@ -348,7 +345,6 @@ class TestCompletionAttributes:
             execution_duration_ms=2500,
             start_time="2024-01-01T12:00:00+00:00",
             finish_time="2024-01-01T12:00:02.5+00:00",
-            enqueue_time="2024-01-01T11:59:50+00:00",
             result_ttl=3600000,
         )
 
@@ -366,7 +362,6 @@ class TestCompletionAttributes:
         assert span_attrs["streaq.task.execution_duration_ms"] == 2500
         assert span_attrs["streaq.task.start_time"] == "2024-01-01T12:00:00+00:00"
         assert span_attrs["streaq.task.finish_time"] == "2024-01-01T12:00:02.5+00:00"
-        assert span_attrs["streaq.task.enqueue_time"] == "2024-01-01T11:59:50+00:00"
         assert span_attrs["streaq.task.result_ttl"] == 3600000
 
 
