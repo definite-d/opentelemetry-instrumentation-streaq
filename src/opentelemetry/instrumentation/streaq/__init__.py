@@ -195,17 +195,17 @@ class StreaqInstrumentor(BaseInstrumentor):
         # Extract parent attributes (not available on Task)
         parent: Any = task.parent
         crontab: str | None = None
-        delay_ms: int | None = self._to_ms(getattr(task, "delay", None))
-        dependencies: list[str] | None = getattr(task, "after", None)
-        expire_ms: int | None = self._to_ms(getattr(parent, "expire", None))
-        fn_name: str = str(getattr(parent, "fn_name", "unknown"))
-        max_retries: int | None = getattr(parent, "max_tries", None)
+        delay_ms: int | None = self._to_ms(task.delay)
+        dependencies: list[str] | None = task.after
+        expire_ms: int | None = self._to_ms(parent.expire)
+        fn_name: str = str(parent.fn_name)
+        max_retries: int | None = parent.max_tries
         scheduled_time: str | None = None
-        task_id: str = str(getattr(task, "id", "unknown"))
-        task_schedule: Any = getattr(task, "schedule", None)
-        timeout_ms: int | None = self._to_ms(getattr(parent, "timeout", None))
-        ttl_ms: int | None = self._to_ms(getattr(parent, "ttl", None))
-        unique: bool | None = getattr(parent, "unique", None)
+        task_id: str = str(task.id)
+        task_schedule: Any = task.schedule
+        timeout_ms: int | None = self._to_ms(parent.timeout)
+        ttl_ms: int | None = self._to_ms(parent.ttl)
+        unique: bool | None = parent.unique
 
         if isinstance(task_schedule, str):
             crontab = task_schedule
@@ -228,25 +228,28 @@ class StreaqInstrumentor(BaseInstrumentor):
             unique=unique,
         ).set(span)
 
-    def _set_consumer_attributes(self, span: trace.Span, worker: Any, msg: Any, destination: str) -> None:
-        consumer_id: str = str(getattr(worker, "id", "unknown"))
-        enqueue_time_iso: str | None = self._timestamp_ms_to_iso(getattr(msg, "enqueue_time", None))
-        message_id: str = str(getattr(msg, "message_id", "unknown"))
-        priorities: list[str] = getattr(worker, "priorities", [])
-        priorities_str: str = ",".join(reversed(priorities)) if priorities else ""
-        priority: str = getattr(msg, "priority", "default")
-        task_function: str = str(getattr(msg, "fn_name", "unknown"))
-        task_id: str = str(getattr(msg, "task_id", "unknown"))
-        timeout_ms: int | None = self._to_ms(getattr(msg, "timeout", None))
-        worker_concurrency: int = getattr(worker, "concurrency", 1)
-        worker_sync_concurrency: int | None = getattr(worker, "sync_concurrency", None)
+    def _set_consumer_attributes(self, span: trace.Span, worker: Any, msg: Any, destination: str, priority: str) -> None:
+        consumer_id: str = str(worker.id)
+        enqueue_time_iso: str | None = self._timestamp_ms_to_iso(msg.enqueue_time)
+        message_id: str = str(msg.message_id)
+        priorities: list[str] = worker.priorities
+        priorities_str: str = ",".join(reversed(priorities))
+        task_function: str = str(msg.fn_name)
+        task_id: str = str(msg.task_id)
+        # Compute timeout the same way the worker does
+        task = worker.registry.get(msg.fn_name)
+        timeout_ms: int | None = None
+        if task is not None and task.timeout is not None:
+            timeout_ms = worker.idle_timeout + self._to_ms(task.timeout)
+        worker_concurrency: int = worker.concurrency
+        worker_sync_concurrency: int | None = worker.sync_concurrency
 
         ConsumerAttributes(
             consumer_id=consumer_id,
             destination=destination,
             enqueue_time=enqueue_time_iso,
             message_id=message_id,
-            retry_count=getattr(msg, "tries", 0),
+            retry_count=msg.tries,
             task_function=task_function,
             task_id=task_id,
             task_priority=str(priority),
@@ -257,8 +260,6 @@ class StreaqInstrumentor(BaseInstrumentor):
         ).set(span)
 
     def _set_completion_attributes(self, span: trace.Span, msg: Any, result: Any) -> None:
-        enqueue_time: float | int | None = getattr(result, "enqueue_time", getattr(msg, "enqueue_time", None))
-        enqueue_time_iso: str | None = self._timestamp_ms_to_iso(enqueue_time)
         execution_duration_ms: int = 0
         finish_time: float | int | None = getattr(result, "finish_time", None)
         finish_time_iso: str | None = self._timestamp_ms_to_iso(finish_time)
@@ -271,7 +272,6 @@ class StreaqInstrumentor(BaseInstrumentor):
             execution_duration_ms = int(finish_time - start_time)
 
         CompletionAttributes(
-            enqueue_time=enqueue_time_iso,
             execution_duration_ms=execution_duration_ms,
             finish_time=finish_time_iso,
             result_ttl=result_ttl,
@@ -279,7 +279,7 @@ class StreaqInstrumentor(BaseInstrumentor):
             success=success,
         ).set(span)
 
-    def _enqueue_wrapper(
+    async def _enqueue_wrapper(
         self,
         wrapped: Callable[..., Any],
         instance: Any,
@@ -287,12 +287,12 @@ class StreaqInstrumentor(BaseInstrumentor):
         kwargs: dict[str, Any],
     ) -> Any:
         if not is_instrumentation_enabled() or self._tracer is None:
-            return wrapped(*args, **kwargs)
+            return await wrapped(*args, **kwargs)
 
         task: Any = instance
-        worker: Any = getattr(task, "worker", None)
-        queue_name: str = getattr(worker, "queue_name", "default")
-        priority: str = getattr(task, "priority", None) or getattr(worker, "priorities", ["default"])[-1]
+        worker: Any = task.worker
+        queue_name: str = worker.queue_name
+        priority: str = getattr(task, "priority", None) or worker.priorities[0]
         destination: str = f"{queue_name}:{priority}"
 
         with self._tracer.start_as_current_span(
@@ -300,15 +300,14 @@ class StreaqInstrumentor(BaseInstrumentor):
             kind=SpanKind.PRODUCER,
         ) as span:
             # Inject trace context into task kwargs before serialization
-            if hasattr(task, "kwargs"):
-                if task.kwargs is None:
-                    task.kwargs = {}
-                carrier: dict[str, str] = {}
-                inject(carrier)
-                inject_metadata(task.kwargs, carrier)
+            if task.kwargs is None:
+                task.kwargs = {}
+            carrier: dict[str, str] = {}
+            inject(carrier)
+            inject_metadata(task.kwargs, carrier)
 
             # Call the original _enqueue method
-            result: Any = wrapped(*args, **kwargs)
+            result: Any = await wrapped(*args, **kwargs)
 
             # Set producer attributes
             self._set_producer_attributes(span, task, destination, priority)
@@ -325,15 +324,12 @@ class StreaqInstrumentor(BaseInstrumentor):
         if not is_instrumentation_enabled() or self._tracer is None:
             return await wrapped(*args, **kwargs)
 
-        msg: Any = kwargs.get("msg") or (args[0] if args else None)
-        if msg is None:
-            return await wrapped(*args, **kwargs)
-
+        msg: Any = kwargs.get("msg") or args[0]
         worker: Any = instance
-        priority: str = getattr(msg, "priority", "default")
-        destination: str = f"{getattr(worker, 'queue_name', 'default')}:{priority}"
+        priority: str = msg.priority
+        destination: str = f"{worker.queue_name}:{priority}"
 
-        carrier: dict[str, Any] = getattr(msg, "kwargs", {})
+        carrier: dict[str, Any] = msg.kwargs
 
         metadata: dict[str, Any] = extract_metadata(carrier)
         parent_context: context_api.Context | None = extract(
@@ -349,7 +345,7 @@ class StreaqInstrumentor(BaseInstrumentor):
                 kind=SpanKind.CONSUMER,
             ) as span,
         ):
-            self._set_consumer_attributes(span, worker, msg, destination)
+            self._set_consumer_attributes(span, worker, msg, destination, priority)
 
             try:
                 result: Any = await wrapped(*args, **kwargs)

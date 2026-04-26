@@ -49,20 +49,6 @@ def instrumentor(tracer_provider):
 
 
 @pytest.fixture
-def mock_task():
-    """Create a mock task object."""
-    task = Mock()
-    task.id = "task-uuid-123"
-    task.kwargs = {}
-    task.timeout = None
-    task.priority = None
-    task.delay = None
-    task.schedule = None
-    task.after = None
-    return task
-
-
-@pytest.fixture
 def mock_worker():
     """Create a mock worker object."""
     worker = Mock()
@@ -70,25 +56,60 @@ def mock_worker():
     worker.name = "test_worker"
     worker.id = "worker-1"
     worker._redis = None
-    worker.priorities = ["default"]
-    worker.concurrency = 1
-    worker.sync_concurrency = None
+    worker.priorities = ["normal"]
+    worker.concurrency = 16
+    worker.sync_concurrency = 16
+    worker.idle_timeout = 60000
+    mock_task = Mock()
+    mock_task.timeout = 30000
+    worker.registry = {"test_task": mock_task}
     return worker
 
 
 @pytest.fixture
+def mock_task(mock_worker):
+    """Create a mock task object."""
+    task = Mock()
+    task.id = "task-uuid-123"
+    task.kwargs = {}
+    task.timeout = None
+    task.priority = "normal"
+    task.delay = None
+    task.schedule = None
+    task.after = []
+    task.worker = mock_worker
+    parent = Mock()
+    parent.fn_name = "test_task"
+    parent.expire = None
+    parent.max_tries = 3
+    parent.timeout = 30000
+    parent.ttl = 3600000
+    parent.unique = False
+    task.parent = parent
+    return task
+
+
+@pytest.fixture
 def mock_instance(mock_worker):
-    """Create a mock task instance."""
-    instance = Mock()
-    instance.fn_name = "test_task"
-    instance.worker = mock_worker
-    instance.timeout = None
-    instance.ttl = None
-    instance.expire = None
-    instance.unique = None
-    instance.max_tries = None
-    instance.crontab = None
-    return instance
+    """Create a mock task instance (Task)."""
+    task = Mock()
+    task.id = "task-uuid-123"
+    task.kwargs = {}
+    task.timeout = None
+    task.priority = "normal"
+    task.delay = None
+    task.schedule = None
+    task.after = []
+    task.worker = mock_worker
+    parent = Mock()
+    parent.fn_name = "test_task"
+    parent.expire = None
+    parent.max_tries = 3
+    parent.timeout = 30000
+    parent.ttl = 3600000
+    parent.unique = False
+    task.parent = parent
+    return task
 
 
 @pytest.fixture
@@ -98,9 +119,9 @@ def mock_msg():
     msg.message_id = "msg-123"
     msg.task_id = "task-456"
     msg.fn_name = "test_task"
-    msg.priority = "default"
+    msg.priority = "normal"
     msg.tries = 0
-    msg.enqueue_time = None
+    msg.enqueue_time = 1718000000000
     msg.kwargs = {}
     msg.timeout = None
     msg.data = None
@@ -113,7 +134,7 @@ def mock_instance_with_worker():
     worker = Mock()
     worker.queue_name = "test_queue"
     worker._redis = None
-    worker.priorities = ["default"]
+    worker.priorities = ["normal"]
 
     instance = Mock()
     instance.fn_name = "test_task"
