@@ -260,8 +260,6 @@ class StreaqInstrumentor(BaseInstrumentor):
         ).set(span)
 
     def _set_completion_attributes(self, span: trace.Span, msg: Any, result: Any) -> None:
-        enqueue_time: float | int | None = getattr(result, "enqueue_time", getattr(msg, "enqueue_time", None))
-        enqueue_time_iso: str | None = self._timestamp_ms_to_iso(enqueue_time)
         execution_duration_ms: int = 0
         finish_time: float | int | None = getattr(result, "finish_time", None)
         finish_time_iso: str | None = self._timestamp_ms_to_iso(finish_time)
@@ -274,7 +272,6 @@ class StreaqInstrumentor(BaseInstrumentor):
             execution_duration_ms = int(finish_time - start_time)
 
         CompletionAttributes(
-            enqueue_time=enqueue_time_iso,
             execution_duration_ms=execution_duration_ms,
             finish_time=finish_time_iso,
             result_ttl=result_ttl,
