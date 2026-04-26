@@ -74,7 +74,7 @@ class ProducerAttributes(BaseAttributes):
     """Always ``"publish"``."""
 
     system: Annotated[str, "messaging.system"] = "redis"
-    """Always ``"redis"``."""
+    """Messaging system backend (currently always redis)."""
 
     destination: Annotated[str, "messaging.destination.name"]
     """Queue and priority (e.g., ``"queue:priority"``)."""
@@ -124,7 +124,7 @@ class ConsumerAttributes(BaseAttributes):
     """Always ``"process"``."""
 
     system: Annotated[str, "messaging.system"] = "redis"
-    """Always ``"redis"``."""
+    """Messaging system backend (currently always redis)."""
 
     destination: Annotated[str, "messaging.destination.name"]
     """Queue and priority."""
@@ -178,9 +178,6 @@ class CompletionAttributes(BaseAttributes):
 
     finish_time: Annotated[str | None, "streaq.task.finish_time"] = None
     """Finish timestamp."""
-
-    enqueue_time: Annotated[str | None, "streaq.task.enqueue_time"] = None
-    """Enqueue timestamp."""
 
     result_ttl: Annotated[int | None, "streaq.task.result_ttl"] = None
     """Result TTL."""
