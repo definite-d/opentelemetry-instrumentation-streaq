@@ -198,10 +198,10 @@ class StreaqInstrumentor(BaseInstrumentor):
         delay_ms: int | None = self._to_ms(getattr(task, "delay", None))
         dependencies: list[str] | None = getattr(task, "after", None)
         expire_ms: int | None = self._to_ms(getattr(parent, "expire", None))
-        fn_name: str = str(getattr(parent, "fn_name", "unknown"))
+        fn_name: str = str(parent.fn_name)
         max_retries: int | None = getattr(parent, "max_tries", None)
         scheduled_time: str | None = None
-        task_id: str = str(getattr(task, "id", "unknown"))
+        task_id: str = str(task.id)
         task_schedule: Any = getattr(task, "schedule", None)
         timeout_ms: int | None = self._to_ms(getattr(parent, "timeout", None))
         ttl_ms: int | None = self._to_ms(getattr(parent, "ttl", None))
@@ -229,16 +229,16 @@ class StreaqInstrumentor(BaseInstrumentor):
         ).set(span)
 
     def _set_consumer_attributes(self, span: trace.Span, worker: Any, msg: Any, destination: str) -> None:
-        consumer_id: str = str(getattr(worker, "id", "unknown"))
+        consumer_id: str = str(worker.id)
         enqueue_time_iso: str | None = self._timestamp_ms_to_iso(getattr(msg, "enqueue_time", None))
-        message_id: str = str(getattr(msg, "message_id", "unknown"))
-        priorities: list[str] = getattr(worker, "priorities", [])
+        message_id: str = str(msg.message_id)
+        priorities: list[str] = worker.priorities
         priorities_str: str = ",".join(reversed(priorities)) if priorities else ""
         priority: str = getattr(msg, "priority", "default")
-        task_function: str = str(getattr(msg, "fn_name", "unknown"))
-        task_id: str = str(getattr(msg, "task_id", "unknown"))
+        task_function: str = str(msg.fn_name)
+        task_id: str = str(msg.task_id)
         timeout_ms: int | None = self._to_ms(getattr(msg, "timeout", None))
-        worker_concurrency: int = getattr(worker, "concurrency", 1)
+        worker_concurrency: int = worker.concurrency
         worker_sync_concurrency: int | None = getattr(worker, "sync_concurrency", None)
 
         ConsumerAttributes(
@@ -246,7 +246,7 @@ class StreaqInstrumentor(BaseInstrumentor):
             destination=destination,
             enqueue_time=enqueue_time_iso,
             message_id=message_id,
-            retry_count=getattr(msg, "tries", 0),
+            retry_count=msg.tries,
             task_function=task_function,
             task_id=task_id,
             task_priority=str(priority),
@@ -291,7 +291,7 @@ class StreaqInstrumentor(BaseInstrumentor):
 
         task: Any = instance
         worker: Any = task.worker
-        queue_name: str = getattr(worker, "queue_name", "default")
+        queue_name: str = worker.queue_name
         priority: str = getattr(task, "priority", None) or worker.priorities[0]
         destination: str = f"{queue_name}:{priority}"
 
@@ -300,12 +300,11 @@ class StreaqInstrumentor(BaseInstrumentor):
             kind=SpanKind.PRODUCER,
         ) as span:
             # Inject trace context into task kwargs before serialization
-            if hasattr(task, "kwargs"):
-                if task.kwargs is None:
-                    task.kwargs = {}
-                carrier: dict[str, str] = {}
-                inject(carrier)
-                inject_metadata(task.kwargs, carrier)
+            if task.kwargs is None:
+                task.kwargs = {}
+            carrier: dict[str, str] = {}
+            inject(carrier)
+            inject_metadata(task.kwargs, carrier)
 
             # Call the original _enqueue method
             result: Any = wrapped(*args, **kwargs)
@@ -331,9 +330,9 @@ class StreaqInstrumentor(BaseInstrumentor):
 
         worker: Any = instance
         priority: str = getattr(msg, "priority", "default")
-        destination: str = f"{getattr(worker, 'queue_name', 'default')}:{priority}"
+        destination: str = f"{worker.queue_name}:{priority}"
 
-        carrier: dict[str, Any] = getattr(msg, "kwargs", {})
+        carrier: dict[str, Any] = msg.kwargs
 
         metadata: dict[str, Any] = extract_metadata(carrier)
         parent_context: context_api.Context | None = extract(
