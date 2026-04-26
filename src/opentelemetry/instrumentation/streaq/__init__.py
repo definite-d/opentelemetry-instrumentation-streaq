@@ -291,7 +291,7 @@ class StreaqInstrumentor(BaseInstrumentor):
 
         task: Any = instance
         worker: Any = task.worker
-        destination: str = getattr(task, "priority", None) or worker.priorities[0]
+        destination: str = getattr(task, "priority", None) or worker.priorities[-1]
 
         with self._tracer.start_as_current_span(
             f"{destination} publish",
