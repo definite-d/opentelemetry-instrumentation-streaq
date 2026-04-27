@@ -209,12 +209,6 @@ class StreaqInstrumentor(BaseInstrumentor):
         ).set(span)
 
     async def _enqueue_wrapper(
-            worker_concurrency=worker_concurrency,
-            worker_priorities=priorities_str,
-            worker_sync_concurrency=worker_sync_concurrency,
-        ).set(span)
-
-    async def _enqueue_wrapper(
         self,
         wrapped: Callable[..., Any],
         instance: Any,
@@ -258,6 +252,7 @@ class StreaqInstrumentor(BaseInstrumentor):
 
         try:
             from streaq.types import TaskDepends
+
             instance.middleware(TaskDepends())(self._otel_middleware())
         except ImportError:
             pass
@@ -335,4 +330,5 @@ class StreaqInstrumentor(BaseInstrumentor):
                         raise
 
             return wrapper
+
         return middleware
