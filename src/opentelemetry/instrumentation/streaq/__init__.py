@@ -90,7 +90,7 @@ import logging
 from collections.abc import Callable, Collection, Iterator
 from contextlib import contextmanager
 from contextvars import Token
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any
 
 import wrapt
@@ -185,98 +185,33 @@ class StreaqInstrumentor(BaseInstrumentor):
             return int(val.total_seconds() * 1000)
         return int(float(val) * 1000)
 
-    @staticmethod
-    def _timestamp_ms_to_iso(ms: Any) -> str | None:
-        if not ms:
-            return None
-        return datetime.fromtimestamp(float(ms) / 1000.0, tz=timezone.utc).isoformat()
-
     def _set_producer_attributes(self, span: trace.Span, task: Any, destination: str) -> None:
-        # Extract parent attributes (not available on Task)
         parent: Any = task.parent
-        crontab: str | None = None
-        delay_ms: int | None = self._to_ms(task.delay)
-        dependencies: list[str] | None = task.after
-        expire_ms: int | None = self._to_ms(parent.expire)
-        fn_name: str = str(parent.fn_name)
-        max_retries: int | None = parent.max_tries
         scheduled_time: str | None = None
         task_id: str = str(task.id)
         task_schedule: Any = task.schedule
+        fn_name: str = str(parent.fn_name)
         timeout_ms: int | None = self._to_ms(parent.timeout)
         ttl_ms: int | None = self._to_ms(parent.ttl)
-        unique: bool | None = parent.unique
 
-        if isinstance(task_schedule, str):
-            crontab = task_schedule
-        elif isinstance(task_schedule, datetime):
+        if isinstance(task_schedule, datetime):
             scheduled_time = task_schedule.isoformat()
 
         ProducerAttributes(
-            crontab=crontab,
-            dependencies=dependencies,
-            delay_ms=delay_ms,
             destination=destination,
-            expire_ms=expire_ms,
-            max_retries=max_retries,
+            operation="publish",
             scheduled_time=scheduled_time,
+            system="redis",
             task_function=fn_name,
             task_id=task_id,
             timeout_ms=timeout_ms,
             ttl_ms=ttl_ms,
-            unique=unique,
         ).set(span)
 
-    def _set_consumer_attributes(
-        self, span: trace.Span, worker: Any, msg: Any, destination: str
-    ) -> None:
-        consumer_id: str = str(worker.id)
-        enqueue_time_iso: str | None = self._timestamp_ms_to_iso(msg.enqueue_time)
-        message_id: str = str(msg.message_id)
-        priorities: list[str] = worker.priorities
-        priorities_str: str = ",".join(reversed(priorities))
-        task_function: str = str(msg.fn_name)
-        task_id: str = str(msg.task_id)
-        # Compute timeout the same way the worker does
-        task = worker.registry.get(msg.fn_name)
-        timeout_ms: int | None = None
-        if task is not None and task.timeout is not None:
-            timeout_ms = worker.idle_timeout + self._to_ms(task.timeout)
-        worker_concurrency: int = worker.concurrency
-        worker_sync_concurrency: int | None = worker.sync_concurrency
-
-        ConsumerAttributes(
-            consumer_id=consumer_id,
-            destination=destination,
-            enqueue_time=enqueue_time_iso,
-            message_id=message_id,
-            retry_count=msg.tries,
-            task_function=task_function,
-            task_id=task_id,
-            timeout_ms=timeout_ms,
+    async def _enqueue_wrapper(
             worker_concurrency=worker_concurrency,
             worker_priorities=priorities_str,
             worker_sync_concurrency=worker_sync_concurrency,
-        ).set(span)
-
-    def _set_completion_attributes(self, span: trace.Span, msg: Any, result: Any) -> None:
-        execution_duration_ms: int = 0
-        finish_time: float | int | None = getattr(result, "finish_time", None)
-        finish_time_iso: str | None = self._timestamp_ms_to_iso(finish_time)
-        result_ttl: int | None = self._to_ms(getattr(result, "ttl", None))
-        start_time: float | int | None = getattr(result, "start_time", None)
-        start_time_iso: str | None = self._timestamp_ms_to_iso(start_time)
-        success: bool = bool(getattr(result, "success", True))
-
-        if start_time is not None and finish_time is not None:
-            execution_duration_ms = int(finish_time - start_time)
-
-        CompletionAttributes(
-            execution_duration_ms=execution_duration_ms,
-            finish_time=finish_time_iso,
-            result_ttl=result_ttl,
-            start_time=start_time_iso,
-            success=success,
         ).set(span)
 
     async def _enqueue_wrapper(
