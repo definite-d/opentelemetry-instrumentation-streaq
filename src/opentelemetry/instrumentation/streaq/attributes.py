@@ -125,30 +125,6 @@ class ConsumerAttributes(BaseAttributes):
     timeout_ms: Annotated[int | None, "streaq.task.timeout_ms"] = None
     """Timeout in milliseconds (inherited from parent)."""
 
-    worker_concurrency: Annotated[int, "streaq.worker.concurrency"]
-    """Worker concurrency."""
-
-    worker_priorities: Annotated[str, "streaq.worker.priorities"]
-    """Worker priorities (comma-separated list of available queue names)."""
-
-    task_id: Annotated[str, "streaq.task.id"]
-    """Task identifier."""
-
-    task_function: Annotated[str, "streaq.task.function"]
-    """Task function name."""
-
-    retry_count: Annotated[int, "streaq.task.retry_count"]
-    """Retry attempt number."""
-
-    enqueue_time: Annotated[str | None, "streaq.task.enqueue_time"] = None
-    """Enqueue timestamp."""
-
-    timeout_ms: Annotated[int | None, "streaq.task.timeout_ms"] = None
-    """Timeout in milliseconds."""
-
-    worker_sync_concurrency: Annotated[int | None, "streaq.worker.sync_concurrency"] = None
-    """Sync concurrency."""
-
 
 @dataclass(kw_only=True)
 class CompletionAttributes(BaseAttributes):
