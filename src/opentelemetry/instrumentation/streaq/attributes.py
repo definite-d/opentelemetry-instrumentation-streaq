@@ -85,29 +85,11 @@ class ProducerAttributes(BaseAttributes):
     task_function: Annotated[str, "streaq.task.function"]
     """Task function name."""
 
-    max_retries: Annotated[int | None, "streaq.task.max_retries"] = None
-    """Max retry attempts."""
-
     timeout_ms: Annotated[int | None, "streaq.task.timeout_ms"] = None
     """Timeout in milliseconds."""
 
     ttl_ms: Annotated[int | None, "streaq.task.ttl_ms"] = None
     """TTL in milliseconds."""
-
-    delay_ms: Annotated[int | None, "streaq.task.delay_ms"] = None
-    """Delay in milliseconds."""
-
-    expire_ms: Annotated[int | None, "streaq.task.expire_ms"] = None
-    """Expiration in milliseconds."""
-
-    unique: Annotated[bool | None, "streaq.task.unique"] = None
-    """Whether task is unique."""
-
-    dependencies: Annotated[Sequence[str] | None, "streaq.task.dependencies"] = None
-    """Task dependencies."""
-
-    crontab: Annotated[str | None, "streaq.task.crontab"] = None
-    """Crontab schedule."""
 
     scheduled_time: Annotated[str | None, "streaq.task.scheduled_time"] = None
     """Scheduled execution time."""
@@ -115,7 +97,12 @@ class ProducerAttributes(BaseAttributes):
 
 @dataclass(kw_only=True)
 class ConsumerAttributes(BaseAttributes):
-    """Consumer span attributes for tasks executed by workers."""
+    """Consumer span attributes for tasks executed by workers.
+
+    Note: Task ID, function, and timeout are inherited from parent via
+    trace context propagation. Only operation, system, retry_count
+    need to be set by the consumer middleware.
+    """
 
     operation: Annotated[str, "messaging.operation"] = "process"
     """Always ``"process"``."""
@@ -126,35 +113,17 @@ class ConsumerAttributes(BaseAttributes):
     destination: Annotated[str, "messaging.destination.name"]
     """Queue name (in streaQ, priority is the queue name)."""
 
-    message_id: Annotated[str, "messaging.message.id"]
-    """Message identifier."""
-
-    consumer_id: Annotated[str, "messaging.consumer.id"]
-    """Worker consumer ID."""
-
-    worker_concurrency: Annotated[int, "streaq.worker.concurrency"]
-    """Worker concurrency."""
-
-    worker_priorities: Annotated[str, "streaq.worker.priorities"]
-    """Worker priorities (comma-separated list of available queue names)."""
-
     task_id: Annotated[str, "streaq.task.id"]
-    """Task identifier."""
+    """Task identifier (inherited from parent)."""
 
     task_function: Annotated[str, "streaq.task.function"]
-    """Task function name."""
+    """Task function name (inherited from parent)."""
 
     retry_count: Annotated[int, "streaq.task.retry_count"]
-    """Retry attempt number."""
-
-    enqueue_time: Annotated[str | None, "streaq.task.enqueue_time"] = None
-    """Enqueue timestamp."""
+    """Retry attempt number (TaskContext.tries)."""
 
     timeout_ms: Annotated[int | None, "streaq.task.timeout_ms"] = None
-    """Timeout in milliseconds."""
-
-    worker_sync_concurrency: Annotated[int | None, "streaq.worker.sync_concurrency"] = None
-    """Sync concurrency."""
+    """Timeout in milliseconds (inherited from parent)."""
 
 
 @dataclass(kw_only=True)
