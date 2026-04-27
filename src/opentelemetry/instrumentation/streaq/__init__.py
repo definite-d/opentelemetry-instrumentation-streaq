@@ -165,7 +165,7 @@ class StreaqInstrumentor(BaseInstrumentor):
             return
 
         wrapt.wrap_function_wrapper(Task, "_enqueue", self._enqueue_wrapper)
-        wrapt.wrap_function_wrapper(Worker, "run_task", self._run_task_wrapper)
+        wrapt.wrap_function_wrapper(Worker, "__init__", self._init_wrapper)
 
     def _unpatch_streaq(self) -> None:
         try:
@@ -175,7 +175,7 @@ class StreaqInstrumentor(BaseInstrumentor):
             return
 
         unwrap(Task, "_enqueue")
-        unwrap(Worker, "run_task")
+        unwrap(Worker, "__init__")
 
     @staticmethod
     def _to_ms(val: Any) -> int | None:
@@ -247,44 +247,92 @@ class StreaqInstrumentor(BaseInstrumentor):
 
         return result
 
-    async def _run_task_wrapper(
+    def _init_wrapper(
         self,
         wrapped: Callable[..., Any],
         instance: Any,
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
     ) -> Any:
-        if not is_instrumentation_enabled() or self._tracer is None:
-            return await wrapped(*args, **kwargs)
+        result = wrapped(*args, **kwargs)
 
-        msg: Any = kwargs.get("msg") or args[0]
-        worker: Any = instance
-        destination: str = msg.priority
+        try:
+            from streaq.types import TaskDepends
+            instance.middleware(TaskDepends())(self._otel_middleware())
+        except ImportError:
+            pass
 
-        carrier: dict[str, Any] = msg.kwargs
+        return result
 
-        metadata: dict[str, Any] = extract_metadata(carrier)
-        parent_context: context_api.Context | None = extract(
-            metadata, getter=StreaqMetadataGetter()
-        )
+    def _otel_middleware(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        def middleware(
+            task: Callable[..., Any],
+            ctx: Any = None,
+        ) -> Any:
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                if not is_instrumentation_enabled() or self._tracer is None:
+                    return await task(*args, **kwargs)
 
-        with (
-            # Attach the parent context to the current context
-            _attached_context(parent_context),
-            # Start a new span with the parent context
-            self._tracer.start_as_current_span(
-                f"{destination} process",
-                kind=SpanKind.CONSUMER,
-            ) as span,
-        ):
-            self._set_consumer_attributes(span, worker, msg, destination)
+                if ctx is None:
+                    return await task(*args, **kwargs)
 
-            try:
-                result: Any = await wrapped(*args, **kwargs)
-                span.set_status(Status(StatusCode.OK))
-                self._set_completion_attributes(span, msg, result)
-                return result
-            except Exception as exc:
-                span.set_status(Status(StatusCode.ERROR, str(exc)))
-                span.record_exception(exc)
-                raise
+                destination: str = getattr(ctx, "priority", "normal")
+                fn_name: str = getattr(ctx, "fn_name", "unknown")
+                retry_count: int = getattr(ctx, "tries", 0)
+                task_id: str = getattr(ctx, "task_id", "")
+                timeout_ms: int | None = getattr(ctx, "timeout", None)
+
+                metadata: dict[str, Any] = extract_metadata(ctx.kwargs)
+                parent_context: context_api.Context | None = extract(
+                    metadata, getter=StreaqMetadataGetter()
+                )
+
+                with (
+                    _attached_context(parent_context),
+                    self._tracer.start_as_current_span(
+                        f"{destination} process",
+                        kind=SpanKind.CONSUMER,
+                    ) as span,
+                ):
+                    ConsumerAttributes(
+                        destination=destination,
+                        operation="process",
+                        retry_count=retry_count,
+                        system="redis",
+                        task_function=fn_name,
+                        task_id=task_id,
+                        timeout_ms=timeout_ms,
+                    ).set(span)
+
+                    start_time: float | None = None
+                    end_time: float | None = None
+                    success: bool = True
+
+                    try:
+                        result = await task(*args, **kwargs)
+                        span.set_status(Status(StatusCode.OK))
+
+                        if hasattr(result, "start_time"):
+                            start_time = result.start_time
+                        if hasattr(result, "finish_time"):
+                            end_time = result.finish_time
+                        if hasattr(result, "success"):
+                            success = result.success
+
+                        execution_duration_ms: int = 0
+                        if start_time is not None and end_time is not None:
+                            execution_duration_ms = int(end_time - start_time)
+
+                        CompletionAttributes(
+                            execution_duration_ms=execution_duration_ms,
+                            success=success,
+                        ).set(span)
+
+                        return result
+                    except Exception as exc:
+                        span.set_status(Status(StatusCode.ERROR, str(exc)))
+                        span.record_exception(exc)
+                        raise
+
+            return wrapper
+        return middleware
