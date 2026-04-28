@@ -91,7 +91,7 @@ import time
 from collections.abc import Callable, Collection, Iterator
 from contextlib import contextmanager
 from contextvars import Token
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import wrapt
@@ -310,6 +310,7 @@ class StreaqInstrumentor(BaseInstrumentor):
 
             success: bool = True
             start_perf = time.perf_counter()
+            start_time_iso = datetime.now(timezone.utc).isoformat()
 
             try:
                 result = await task(*args, **kwargs)
@@ -323,6 +324,7 @@ class StreaqInstrumentor(BaseInstrumentor):
             finally:
                 end_perf = time.perf_counter()
                 execution_duration_ms = int((end_perf - start_perf) * 1000)
+                finish_time_iso = datetime.now(timezone.utc).isoformat()
 
                 result_ttl = None
                 if hasattr(ctx, "ttl") and ctx.ttl is not None:
@@ -331,5 +333,7 @@ class StreaqInstrumentor(BaseInstrumentor):
                 CompletionAttributes(
                     success=success,
                     execution_duration_ms=execution_duration_ms,
+                    start_time=start_time_iso,
+                    finish_time=finish_time_iso,
                     result_ttl=result_ttl,
                 ).set(span)
