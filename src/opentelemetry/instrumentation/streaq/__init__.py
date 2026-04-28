@@ -259,9 +259,11 @@ try:
         return result
 
     def _otel_middleware(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        from streaq.types import TaskDepends
+
         def middleware(
             task: Callable[..., Any],
-            ctx: Any = None,
+            ctx: TaskDepends = None,
         ) -> Any:
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
                 if not is_instrumentation_enabled() or self._tracer is None:
