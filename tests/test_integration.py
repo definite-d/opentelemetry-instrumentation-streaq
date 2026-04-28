@@ -12,13 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 from unittest.mock import Mock
 
 import pytest
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.semconv.attributes.exception_attributes import (
     EXCEPTION_MESSAGE,
     EXCEPTION_STACKTRACE,
@@ -26,7 +22,6 @@ from opentelemetry.semconv.attributes.exception_attributes import (
 )
 from opentelemetry.trace import SpanKind, StatusCode
 
-from opentelemetry.instrumentation.streaq import StreaqInstrumentor
 from opentelemetry.instrumentation.streaq.utils import OTEL_METADATA_KEY
 
 
@@ -93,13 +88,10 @@ class TestConsumerSpan:
         mock_ctx.tries = 0
         mock_ctx.task_id = "task-456"
         mock_ctx.timeout = None
+        mock_ctx.ttl = None
 
         async def mock_task():
-            return Mock(
-                success=True,
-                start_time=time.time(),
-                finish_time=time.time(),
-            )
+            return "result"
 
         await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
 
@@ -119,6 +111,7 @@ class TestConsumerSpan:
         mock_ctx.tries = 0
         mock_ctx.task_id = "task-456"
         mock_ctx.timeout = None
+        mock_ctx.ttl = None
 
         async def mock_task():
             raise ValueError("Task failed!")
@@ -147,6 +140,54 @@ class TestConsumerSpan:
         assert EXCEPTION_STACKTRACE in event.attributes
         assert event.attributes[EXCEPTION_TYPE] == "ValueError"
         assert event.attributes[EXCEPTION_MESSAGE] == "Task failed!"
+
+    async def test_completion_attributes_set(self, instrumentor, mock_msg, memory_exporter):
+        """Completion attributes are set correctly after task execution."""
+        mock_ctx = Mock()
+        mock_ctx.kwargs = {}
+        mock_ctx.priority = "normal"
+        mock_ctx.fn_name = "test_task"
+        mock_ctx.tries = 0
+        mock_ctx.task_id = "task-456"
+        mock_ctx.timeout = None
+        mock_ctx.ttl = None
+
+        async def mock_task():
+            return "result"
+
+        await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+
+        spans = memory_exporter.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+
+        assert span.attributes["streaq.task.success"] is True
+        assert "streaq.task.execution_duration_ms" in span.attributes
+        assert span.attributes["streaq.task.execution_duration_ms"] >= 0
+
+    async def test_completion_attributes_on_failure(self, instrumentor, mock_msg, memory_exporter):
+        """Completion attributes reflect failure on task exception."""
+        mock_ctx = Mock()
+        mock_ctx.kwargs = {}
+        mock_ctx.priority = "normal"
+        mock_ctx.fn_name = "failing_task"
+        mock_ctx.tries = 0
+        mock_ctx.task_id = "task-789"
+        mock_ctx.timeout = None
+        mock_ctx.ttl = None
+
+        async def mock_task():
+            raise ValueError("Task failed!")
+
+        with pytest.raises(ValueError):
+            await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+
+        spans = memory_exporter.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+
+        assert span.attributes["streaq.task.success"] is False
+        assert "streaq.task.execution_duration_ms" in span.attributes
 
 
 class TestContextPropagation:

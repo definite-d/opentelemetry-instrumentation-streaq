@@ -87,6 +87,7 @@ API
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable, Collection, Iterator
 from contextlib import contextmanager
 from contextvars import Token
@@ -307,32 +308,28 @@ class StreaqInstrumentor(BaseInstrumentor):
                 timeout_ms=timeout_ms,
             ).set(span)
 
-            start_time: float | None = None
-            end_time: float | None = None
             success: bool = True
+            start_perf = time.perf_counter()
 
             try:
                 result = await task(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
-
-                if hasattr(result, "start_time"):
-                    start_time = result.start_time
-                if hasattr(result, "finish_time"):
-                    end_time = result.finish_time
-                if hasattr(result, "success"):
-                    success = result.success
-
-                execution_duration_ms: int = 0
-                if start_time is not None and end_time is not None:
-                    execution_duration_ms = int(end_time - start_time)
-
-                CompletionAttributes(
-                    execution_duration_ms=execution_duration_ms,
-                    success=success,
-                ).set(span)
-
                 return result
             except Exception as exc:
+                success = False
                 span.set_status(Status(StatusCode.ERROR, str(exc)))
                 span.record_exception(exc)
                 raise
+            finally:
+                end_perf = time.perf_counter()
+                execution_duration_ms = int((end_perf - start_perf) * 1000)
+
+                result_ttl = None
+                if hasattr(ctx, "ttl") and ctx.ttl is not None:
+                    result_ttl = self._to_ms(ctx.ttl)
+
+                CompletionAttributes(
+                    success=success,
+                    execution_duration_ms=execution_duration_ms,
+                    result_ttl=result_ttl,
+                ).set(span)
