@@ -251,8 +251,6 @@ class StreaqInstrumentor(BaseInstrumentor):
         result = wrapped(*args, **kwargs)
 
         try:
-            from streaq.types import TaskDepends
-
             instance.middleware(self._otel_middleware())
         except ImportError:
             pass
@@ -260,11 +258,9 @@ class StreaqInstrumentor(BaseInstrumentor):
         return result
 
     def _otel_middleware(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        from streaq.types import TaskDepends
-
         def middleware(
             task: Callable[..., Any],
-            ctx: TaskDepends = None,
+            ctx: Any = None,
         ) -> Any:
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
                 if not is_instrumentation_enabled() or self._tracer is None:
