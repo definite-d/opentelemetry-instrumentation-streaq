@@ -253,7 +253,7 @@ class StreaqInstrumentor(BaseInstrumentor):
         try:
             from streaq.types import TaskDepends
 
-            instance.middleware(self._otel_middleware)
+            instance.middleware(self._otel_middleware())
         except ImportError:
             pass
 
