@@ -251,82 +251,87 @@ class StreaqInstrumentor(BaseInstrumentor):
         result = wrapped(*args, **kwargs)
 
         try:
-            instance.middleware(self._otel_middleware())
+            from streaq.types import ReturnCoroutine, TaskContext, TaskDepends
+
+            @instance.middleware
+            def otel_middleware(task: ReturnCoroutine) -> ReturnCoroutine:
+                async def wrapper(
+                    *args: Any,
+                    ctx: TaskContext = TaskDepends(),
+                    **kwargs: Any,
+                ) -> Any:
+                    return await self._otel_task_handler(task, ctx, *args, **kwargs)
+
+                return wrapper
         except ImportError:
             pass
 
         return result
 
-    def _otel_middleware(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        def middleware(
-            task: Callable[..., Any],
-            ctx: Any = None,
-        ) -> Any:
-            async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                if not is_instrumentation_enabled() or self._tracer is None:
-                    return await task(*args, **kwargs)
+    async def _otel_task_handler(
+        self,
+        task: Callable[..., Any],
+        ctx: Any,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        if not is_instrumentation_enabled() or self._tracer is None:
+            return await task(*args, **kwargs)
 
-                if ctx is None:
-                    return await task(*args, **kwargs)
+        timeout_ms: int | None = self._to_ms(ctx.timeout)
+        destination: str = ctx.fn_name.split(".")[0] if ctx.fn_name else "unknown"
+        fn_name: str = ctx.fn_name
+        retry_count: int = ctx.tries
+        task_id: str = ctx.task_id
 
-                destination: str = getattr(ctx, "priority", "normal")
-                fn_name: str = getattr(ctx, "fn_name", "unknown")
-                retry_count: int = getattr(ctx, "tries", 0)
-                task_id: str = getattr(ctx, "task_id", "")
-                timeout_ms: int | None = getattr(ctx, "timeout", None)
+        metadata: dict[str, Any] = extract_metadata(ctx.kwargs)
+        parent_context: context_api.Context | None = extract(
+            metadata, getter=StreaqMetadataGetter()
+        )
 
-                metadata: dict[str, Any] = extract_metadata(ctx.kwargs)
-                parent_context: context_api.Context | None = extract(
-                    metadata, getter=StreaqMetadataGetter()
-                )
+        with (
+            _attached_context(parent_context),
+            self._tracer.start_as_current_span(
+                f"{destination} process",
+                kind=SpanKind.CONSUMER,
+            ) as span,
+        ):
+            ConsumerAttributes(
+                destination=destination,
+                operation="process",
+                retry_count=retry_count,
+                system="redis",
+                task_function=fn_name,
+                task_id=task_id,
+                timeout_ms=timeout_ms,
+            ).set(span)
 
-                with (
-                    _attached_context(parent_context),
-                    self._tracer.start_as_current_span(
-                        f"{destination} process",
-                        kind=SpanKind.CONSUMER,
-                    ) as span,
-                ):
-                    ConsumerAttributes(
-                        destination=destination,
-                        operation="process",
-                        retry_count=retry_count,
-                        system="redis",
-                        task_function=fn_name,
-                        task_id=task_id,
-                        timeout_ms=timeout_ms,
-                    ).set(span)
+            start_time: float | None = None
+            end_time: float | None = None
+            success: bool = True
 
-                    start_time: float | None = None
-                    end_time: float | None = None
-                    success: bool = True
+            try:
+                result = await task(*args, **kwargs)
+                span.set_status(Status(StatusCode.OK))
 
-                    try:
-                        result = await task(*args, **kwargs)
-                        span.set_status(Status(StatusCode.OK))
+                if hasattr(result, "start_time"):
+                    start_time = result.start_time
+                if hasattr(result, "finish_time"):
+                    end_time = result.finish_time
+                if hasattr(result, "success"):
+                    success = result.success
 
-                        if hasattr(result, "start_time"):
-                            start_time = result.start_time
-                        if hasattr(result, "finish_time"):
-                            end_time = result.finish_time
-                        if hasattr(result, "success"):
-                            success = result.success
+                execution_duration_ms: int = 0
+                if start_time is not None and end_time is not None:
+                    execution_duration_ms = int(end_time - start_time)
 
-                        execution_duration_ms: int = 0
-                        if start_time is not None and end_time is not None:
-                            execution_duration_ms = int(end_time - start_time)
+                CompletionAttributes(
+                    execution_duration_ms=execution_duration_ms,
+                    success=success,
+                ).set(span)
 
-                        CompletionAttributes(
-                            execution_duration_ms=execution_duration_ms,
-                            success=success,
-                        ).set(span)
-
-                        return result
-                    except Exception as exc:
-                        span.set_status(Status(StatusCode.ERROR, str(exc)))
-                        span.record_exception(exc)
-                        raise
-
-            return wrapper
-
-        return middleware
+                return result
+            except Exception as exc:
+                span.set_status(Status(StatusCode.ERROR, str(exc)))
+                span.record_exception(exc)
+                raise
