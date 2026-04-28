@@ -101,8 +101,7 @@ class TestConsumerSpan:
                 finish_time=time.time(),
             )
 
-        middleware = instrumentor._otel_middleware()
-        await middleware(mock_task, ctx=mock_ctx)()
+        await instrumentor._otel_task_handler(mock_task, mock_ctx)
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -124,10 +123,8 @@ class TestConsumerSpan:
         async def mock_task():
             raise ValueError("Task failed!")
 
-        middleware = instrumentor._otel_middleware()
-
         with pytest.raises(ValueError):
-            await middleware(mock_task, ctx=mock_ctx)()
+            await instrumentor._otel_task_handler(mock_task, mock_ctx)
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -184,7 +181,7 @@ class TestErrorHandling:
             return "result"
 
         instrumentor._tracer = None
-        result = await instrumentor._otel_middleware()(mock_task, ctx=mock_ctx)()
+        result = await instrumentor._otel_task_handler(mock_task, mock_ctx)
 
         assert result == "result"
         spans = memory_exporter.get_finished_spans()
