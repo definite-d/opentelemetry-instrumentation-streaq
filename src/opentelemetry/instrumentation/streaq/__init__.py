@@ -250,10 +250,9 @@ class StreaqInstrumentor(BaseInstrumentor):
     ) -> Any:
         result = wrapped(*args, **kwargs)
 
-        try:
+try:
             from streaq.types import TaskDepends
-
-            instance.middleware(TaskDepends())(self._otel_middleware())
+            instance.middleware(self._otel_middleware)
         except ImportError:
             pass
 
