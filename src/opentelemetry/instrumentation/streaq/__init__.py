@@ -284,7 +284,7 @@ class StreaqInstrumentor(BaseInstrumentor):
         timeout_ms: int | None = self._to_ms(ctx.timeout)
         destination: str = ctx.fn_name.split(".")[0] if ctx.fn_name else "unknown"
         fn_name: str = ctx.fn_name
-        retry_count: int = ctx.tries
+        retry_count: int = max(0, ctx.tries - 1)
         task_id: str = ctx.task_id
 
         parent_context: context_api.Context | None = extract(

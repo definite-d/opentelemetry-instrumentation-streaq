@@ -85,7 +85,7 @@ class TestConsumerSpan:
         mock_ctx.kwargs = {}
         mock_ctx.priority = "normal"
         mock_ctx.fn_name = "test_task"
-        mock_ctx.tries = 0
+        mock_ctx.tries = 1  # First attempt in streaq
         mock_ctx.task_id = "task-456"
         mock_ctx.timeout = None
         mock_ctx.ttl = None
@@ -101,6 +101,7 @@ class TestConsumerSpan:
         span = spans[0]
         assert span.kind == SpanKind.CONSUMER
         assert "process" in span.name
+        assert span.attributes["streaq.task.retry_count"] == 0  # tries - 1
 
     async def test_middleware_records_exception(self, instrumentor, mock_msg, memory_exporter):
         """Middleware records exception details on failure."""
@@ -108,7 +109,7 @@ class TestConsumerSpan:
         mock_ctx.kwargs = {}
         mock_ctx.priority = "normal"
         mock_ctx.fn_name = "failing_task"
-        mock_ctx.tries = 0
+        mock_ctx.tries = 1  # First attempt in streaq
         mock_ctx.task_id = "task-456"
         mock_ctx.timeout = None
         mock_ctx.ttl = None
@@ -124,6 +125,7 @@ class TestConsumerSpan:
 
         span = spans[0]
         assert span.status.status_code == StatusCode.ERROR
+        assert span.attributes["streaq.task.retry_count"] == 0  # tries - 1
 
         exception_events = [e for e in span.events if e.name == "exception"]
         assert len(exception_events) >= 1
@@ -171,7 +173,7 @@ class TestConsumerSpan:
         mock_ctx.kwargs = {}
         mock_ctx.priority = "normal"
         mock_ctx.fn_name = "failing_task"
-        mock_ctx.tries = 0
+        mock_ctx.tries = 1  # First attempt in streaq
         mock_ctx.task_id = "task-789"
         mock_ctx.timeout = None
         mock_ctx.ttl = None
@@ -188,6 +190,31 @@ class TestConsumerSpan:
 
         assert span.attributes["streaq.task.success"] is False
         assert "streaq.task.execution_duration_ms" in span.attributes
+
+    async def test_retry_count_correctly_calculated(self, instrumentor, mock_msg, memory_exporter):
+        """Retry count is attempts - 1 (0 for first try, 1 for second, etc.)."""
+        mock_ctx = Mock()
+        mock_ctx.kwargs = {}
+        mock_ctx.priority = "normal"
+        mock_ctx.fn_name = "test_task"
+        mock_ctx.task_id = "task-999"
+        mock_ctx.timeout = None
+        mock_ctx.ttl = None
+
+        # Simulate 2nd attempt (tries=2 in streaq means 1 retry occurred)
+        mock_ctx.tries = 2
+
+        async def mock_task():
+            return "result"
+
+        await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+
+        spans = memory_exporter.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+
+        # tries=2 means 1 retry occurred, so retry_count should be 1
+        assert span.attributes["streaq.task.retry_count"] == 1
 
 
 class TestContextPropagation:
@@ -214,9 +241,10 @@ class TestErrorHandling:
         mock_ctx.kwargs = {}
         mock_ctx.priority = "normal"
         mock_ctx.fn_name = "test_task"
-        mock_ctx.tries = 0
+        mock_ctx.tries = 1  # First attempt in streaq
         mock_ctx.task_id = "task-123"
         mock_ctx.timeout = None
+        mock_ctx.ttl = None
 
         async def mock_task():
             return "result"
