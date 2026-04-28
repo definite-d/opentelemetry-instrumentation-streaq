@@ -260,7 +260,8 @@ class StreaqInstrumentor(BaseInstrumentor):
                     ctx: TaskContext = TaskDepends(),
                     **kwargs: Any,
                 ) -> Any:
-                    return await self._otel_task_handler(task, ctx, *args, **kwargs)
+                    otel_ctx = extract_metadata(kwargs)
+                    return await self._otel_task_handler(task, ctx, otel_ctx, *args, **kwargs)
 
                 return wrapper
         except ImportError:
@@ -272,6 +273,7 @@ class StreaqInstrumentor(BaseInstrumentor):
         self,
         task: Callable[..., Any],
         ctx: Any,
+        otel_ctx: dict[str, Any],
         *args: Any,
         **kwargs: Any,
     ) -> Any:
@@ -284,9 +286,8 @@ class StreaqInstrumentor(BaseInstrumentor):
         retry_count: int = ctx.tries
         task_id: str = ctx.task_id
 
-        metadata: dict[str, Any] = extract_metadata(ctx.kwargs)
         parent_context: context_api.Context | None = extract(
-            metadata, getter=StreaqMetadataGetter()
+            otel_ctx, getter=StreaqMetadataGetter()
         )
 
         with (
