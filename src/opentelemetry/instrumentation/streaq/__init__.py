@@ -249,6 +249,7 @@ class StreaqInstrumentor(BaseInstrumentor):
         kwargs: dict[str, Any],
     ) -> Any:
         result = wrapped(*args, **kwargs)
+        worker_id: str = instance.id
 
         try:
             from streaq.types import ReturnCoroutine, TaskContext, TaskDepends
@@ -261,7 +262,9 @@ class StreaqInstrumentor(BaseInstrumentor):
                     **kwargs: Any,
                 ) -> Any:
                     otel_ctx = extract_metadata(kwargs)
-                    return await self._otel_task_handler(task, ctx, otel_ctx, *args, **kwargs)
+                    return await self._otel_task_handler(
+                        task, ctx, otel_ctx, worker_id, *args, **kwargs
+                    )
 
                 return wrapper
         except ImportError:
@@ -274,6 +277,7 @@ class StreaqInstrumentor(BaseInstrumentor):
         task: Callable[..., Any],
         ctx: Any,
         otel_ctx: dict[str, Any],
+        worker_id: str,
         *args: Any,
         **kwargs: Any,
     ) -> Any:
@@ -303,6 +307,7 @@ class StreaqInstrumentor(BaseInstrumentor):
                 system="redis",
                 operation_name=fn_name,
                 message_id=task_id,
+                consumer_id=worker_id,
                 timeout_ms=timeout_ms,
             ).set(span)
 
@@ -317,6 +322,7 @@ class StreaqInstrumentor(BaseInstrumentor):
             except Exception as exc:
                 success = False
                 span.set_status(Status(StatusCode.ERROR, str(exc)))
+                span.set_attribute("error.type", exc.__class__.__name__)
                 span.record_exception(exc)
                 raise
             finally:

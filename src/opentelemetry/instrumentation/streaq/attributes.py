@@ -118,6 +118,9 @@ class ConsumerAttributes(BaseAttributes):
     operation_name: Annotated[str, "messaging.operation.name"]
     """The task function name. Maps from ``streaq.task.function``, inherited from the producer span."""
 
+    consumer_id: Annotated[str, "messaging.consumer.id"]
+    """The consumer (worker) identifier. Maps from ``Worker.id``."""
+
     retry_count: Annotated[int, "streaq.task.retry_count"]
     """Current retry attempt for this task. Maps from ``TaskContext.tries``."""
 
