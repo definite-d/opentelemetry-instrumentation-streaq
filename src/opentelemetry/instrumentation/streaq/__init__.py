@@ -200,13 +200,18 @@ class StreaqInstrumentor(BaseInstrumentor):
 
         ProducerAttributes(
             destination=destination,
-            operation="publish",
             scheduled_time=scheduled_time,
             system="redis",
-            task_function=fn_name,
-            task_id=task_id,
+            operation_name=fn_name,
+            message_id=task_id,
             timeout_ms=timeout_ms,
             ttl_ms=ttl_ms,
+            max_retries=parent.max_tries,
+            delay_ms=self._to_ms(task.delay),
+            expire_ms=self._to_ms(parent.expire),
+            unique=parent.unique if hasattr(parent, "unique") else None,
+            dependencies=task.after or None,
+            crontab=task_schedule if isinstance(task_schedule, str) else None,
         ).set(span)
 
     async def _enqueue_wrapper(
@@ -224,7 +229,7 @@ class StreaqInstrumentor(BaseInstrumentor):
         destination: str = getattr(task, "priority", None) or worker.priorities[-1]
 
         with self._tracer.start_as_current_span(
-            f"{destination} publish",
+            f"{destination} send",
             kind=SpanKind.PRODUCER,
         ) as span:
             # Inject trace context into task kwargs before serialization
@@ -250,6 +255,7 @@ class StreaqInstrumentor(BaseInstrumentor):
         kwargs: dict[str, Any],
     ) -> Any:
         result = wrapped(*args, **kwargs)
+        worker_id: str = instance.id
 
         try:
             from streaq.types import ReturnCoroutine, TaskContext, TaskDepends
@@ -262,7 +268,9 @@ class StreaqInstrumentor(BaseInstrumentor):
                     **kwargs: Any,
                 ) -> Any:
                     otel_ctx = extract_metadata(kwargs)
-                    return await self._otel_task_handler(task, ctx, otel_ctx, *args, **kwargs)
+                    return await self._otel_task_handler(
+                        task, ctx, otel_ctx, worker_id, *args, **kwargs
+                    )
 
                 return wrapper
         except ImportError:
@@ -275,6 +283,7 @@ class StreaqInstrumentor(BaseInstrumentor):
         task: Callable[..., Any],
         ctx: Any,
         otel_ctx: dict[str, Any],
+        worker_id: str,
         *args: Any,
         **kwargs: Any,
     ) -> Any:
@@ -300,11 +309,11 @@ class StreaqInstrumentor(BaseInstrumentor):
         ):
             ConsumerAttributes(
                 destination=destination,
-                operation="process",
                 retry_count=retry_count,
                 system="redis",
-                task_function=fn_name,
-                task_id=task_id,
+                operation_name=fn_name,
+                message_id=task_id,
+                consumer_id=worker_id,
                 timeout_ms=timeout_ms,
             ).set(span)
 
@@ -319,6 +328,7 @@ class StreaqInstrumentor(BaseInstrumentor):
             except Exception as exc:
                 success = False
                 span.set_status(Status(StatusCode.ERROR, str(exc)))
+                span.set_attribute("error.type", exc.__class__.__name__)
                 span.record_exception(exc)
                 raise
             finally:

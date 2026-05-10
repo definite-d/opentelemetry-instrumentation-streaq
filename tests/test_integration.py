@@ -43,11 +43,11 @@ class TestStreaqInstrumentation:
 
         span = spans[0]
         assert span.kind == SpanKind.PRODUCER
-        assert "publish" in span.name
-        assert span.attributes["messaging.operation"] == "publish"
+        assert "send" in span.name
+        assert span.attributes["messaging.operation.type"] == "send"
         assert span.attributes["messaging.system"] == "redis"
         assert span.attributes["messaging.destination.name"] == "normal"
-        assert span.attributes["streaq.task.function"] == "test_task"
+        assert span.attributes["messaging.operation.name"] == "test_task"
 
     async def test_enqueue_injects_context(self, instrumentor, mock_instance, mock_task):
         """Enqueue injects trace context into task kwargs."""
@@ -93,7 +93,7 @@ class TestConsumerSpan:
         async def mock_task():
             return "result"
 
-        await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+        await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -118,7 +118,7 @@ class TestConsumerSpan:
             raise ValueError("Task failed!")
 
         with pytest.raises(ValueError):
-            await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+            await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -157,7 +157,7 @@ class TestConsumerSpan:
         async def mock_task():
             return "result"
 
-        await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+        await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -182,7 +182,7 @@ class TestConsumerSpan:
             raise ValueError("Task failed!")
 
         with pytest.raises(ValueError):
-            await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+            await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -207,7 +207,7 @@ class TestConsumerSpan:
         async def mock_task():
             return "result"
 
-        await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+        await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -250,7 +250,7 @@ class TestErrorHandling:
             return "result"
 
         instrumentor._tracer = None
-        result = await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+        result = await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         assert result == "result"
         spans = memory_exporter.get_finished_spans()

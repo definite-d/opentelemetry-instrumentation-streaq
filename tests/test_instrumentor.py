@@ -37,11 +37,11 @@ class TestProducerSpanCreation:
 
         span = spans[0]
         assert span.kind == SpanKind.PRODUCER
-        assert "publish" in span.name
-        assert span.attributes["messaging.operation"] == "publish"
+        assert "send" in span.name
+        assert span.attributes["messaging.operation.type"] == "send"
         assert span.attributes["messaging.system"] == "redis"
         assert span.attributes["messaging.destination.name"] == "normal"
-        assert span.attributes["streaq.task.function"] == "test_task"
+        assert span.attributes["messaging.operation.name"] == "test_task"
 
     async def test_enqueue_injects_context(self, instrumentor, mock_instance, mock_task):
         """Enqueue injects trace context into task kwargs."""

@@ -82,43 +82,36 @@ class TestAttributeValueTypes:
 class TestBaseAttributes:
     """Test BaseAttributes class."""
 
-    def test_get_otel_map_returns_mapping(self):
-        """_get_otel_map returns field name to OTel key mapping."""
-        mapping = ProducerAttributes._get_otel_map()
+    def test_get_otel_pairs_returns_list(self):
+        """_get_otel_pairs returns list of (field, key) tuples."""
+        pairs = ProducerAttributes._get_otel_pairs()
 
-        assert isinstance(mapping, dict)
-        assert "operation" in mapping
-        assert "destination" in mapping
-        assert "task_id" in mapping
+        assert isinstance(pairs, list)
+        assert ("operation_type", "messaging.operation.type") in pairs
+        assert ("destination", "messaging.destination.name") in pairs
+        assert ("message_id", "messaging.message.id") in pairs
 
-    def test_get_otel_map_uses_metadata_key(self):
-        """_get_otel_map uses Annotated metadata as OTel key."""
-        mapping = ProducerAttributes._get_otel_map()
+    def test_get_otel_pairs_uses_metadata_key(self):
+        """_get_otel_pairs uses Annotated metadata as OTel key."""
+        pairs = ProducerAttributes._get_otel_pairs()
 
-        assert mapping["operation"] == "messaging.operation"
-        assert mapping["system"] == "messaging.system"
-        assert mapping["destination"] == "messaging.destination.name"
+        assert ("operation_type", "messaging.operation.type") in pairs
+        assert ("system", "messaging.system") in pairs
+        assert ("destination", "messaging.destination.name") in pairs
 
-    def test_get_otel_map_uses_field_name_without_metadata(self):
-        """_get_otel_map uses field name when no Annotated metadata."""
-        mapping = ProducerAttributes._get_otel_map()
+    def test_get_otel_pairs_caches_result(self):
+        """_get_otel_pairs caches pairs for performance."""
+        pairs1 = ProducerAttributes._get_otel_pairs()
+        pairs2 = ProducerAttributes._get_otel_pairs()
 
-        assert mapping["task_id"] == "streaq.task.id"
-        assert mapping["task_function"] == "streaq.task.function"
-
-    def test_get_otel_map_caches_result(self):
-        """_get_otel_map caches mapping for performance."""
-        mapping1 = ProducerAttributes._get_otel_map()
-        mapping2 = ProducerAttributes._get_otel_map()
-
-        assert mapping1 is mapping2
+        assert pairs1 is pairs2
 
     def test_set_filters_none_values(self, fresh_tracer_provider):
         """set filters out None values before setting on span."""
         attrs = ProducerAttributes(
             destination="normal",
-            task_id="task-123",
-            task_function="test_task",
+            message_id="task-123",
+            operation_name="test_task",
         )
 
         exporter = InMemorySpanExporter()
@@ -133,18 +126,17 @@ class TestBaseAttributes:
         set_attrs = spans[0].attributes or {}
 
         assert "messaging.destination.name" in set_attrs
-        assert "streaq.task.id" in set_attrs
-        assert "streaq.task.function" in set_attrs
+        assert "messaging.message.id" in set_attrs
+        assert "messaging.operation.name" in set_attrs
 
-        assert "streaq.task.max_retries" not in set_attrs
         assert "streaq.task.timeout_ms" not in set_attrs
 
     def test_set_calls_set_attributes_once(self, fresh_tracer_provider):
         """set calls span.set_attributes exactly once with all non-None attrs."""
         attrs = ProducerAttributes(
             destination="normal",
-            task_id="abc",
-            task_function="func",
+            message_id="abc",
+            operation_name="func",
             timeout_ms=30000,
         )
 
@@ -166,19 +158,19 @@ class TestProducerAttributes:
         """ProducerAttributes has correct default values."""
         attrs = ProducerAttributes(
             destination="normal",
-            task_id="task-1",
-            task_function="my_task",
+            message_id="task-1",
+            operation_name="my_task",
         )
 
-        assert attrs.operation == "publish"
+        assert attrs.operation_type == "send"
         assert attrs.system == "redis"
 
     def test_all_optional_fields_none_by_default(self):
         """Optional fields default to None."""
         attrs = ProducerAttributes(
             destination="normal",
-            task_id="task-123",
-            task_function="test_task",
+            message_id="task-123",
+            operation_name="test_task",
         )
 
         assert attrs.timeout_ms is None
@@ -189,8 +181,8 @@ class TestProducerAttributes:
         """ProducerAttributes.set() sets all attributes on span."""
         attrs = ProducerAttributes(
             destination="normal",
-            task_id="task-uuid",
-            task_function="process_data",
+            message_id="task-uuid",
+            operation_name="process_data",
             timeout_ms=30000,
             ttl_ms=60000,
         )
@@ -205,11 +197,11 @@ class TestProducerAttributes:
         spans = exporter.get_finished_spans()
         assert len(spans) == 1
         span_attrs = spans[0].attributes or {}
-        assert span_attrs["messaging.operation"] == "publish"
+        assert span_attrs["messaging.operation.type"] == "send"
         assert span_attrs["messaging.system"] == "redis"
         assert span_attrs["messaging.destination.name"] == "normal"
-        assert span_attrs["streaq.task.id"] == "task-uuid"
-        assert span_attrs["streaq.task.function"] == "process_data"
+        assert span_attrs["messaging.message.id"] == "task-uuid"
+        assert span_attrs["messaging.operation.name"] == "process_data"
         assert span_attrs["streaq.task.timeout_ms"] == 30000
         assert span_attrs["streaq.task.ttl_ms"] == 60000
 
@@ -221,21 +213,23 @@ class TestConsumerAttributes:
         """ConsumerAttributes has correct default values."""
         attrs = ConsumerAttributes(
             destination="normal",
-            task_id="task-123",
-            task_function="test_fn",
+            message_id="task-123",
+            operation_name="test_fn",
             retry_count=0,
+            consumer_id="worker-1",
         )
 
-        assert attrs.operation == "process"
+        assert attrs.operation_type == "process"
         assert attrs.system == "redis"
 
     def test_all_optional_fields_none_by_default(self):
         """Optional fields default to None."""
         attrs = ConsumerAttributes(
             destination="normal",
-            task_id="task-1",
-            task_function="task",
+            message_id="task-1",
+            operation_name="task",
             retry_count=0,
+            consumer_id="worker-1",
         )
 
         assert attrs.timeout_ms is None
@@ -244,10 +238,11 @@ class TestConsumerAttributes:
         """ConsumerAttributes.set() sets all attributes on span."""
         attrs = ConsumerAttributes(
             destination="normal",
-            task_id="task-xyz",
-            task_function="handler_func",
+            message_id="task-xyz",
+            operation_name="handler_func",
             retry_count=2,
             timeout_ms=5000,
+            consumer_id="worker-1",
         )
 
         exporter = InMemorySpanExporter()
@@ -260,11 +255,12 @@ class TestConsumerAttributes:
         spans = exporter.get_finished_spans()
         assert len(spans) == 1
         span_attrs = spans[0].attributes or {}
-        assert span_attrs["messaging.operation"] == "process"
+        assert span_attrs["messaging.operation.type"] == "process"
         assert span_attrs["messaging.system"] == "redis"
         assert span_attrs["messaging.destination.name"] == "normal"
-        assert span_attrs["streaq.task.id"] == "task-xyz"
-        assert span_attrs["streaq.task.function"] == "handler_func"
+        assert span_attrs["messaging.message.id"] == "task-xyz"
+        assert span_attrs["messaging.operation.name"] == "handler_func"
+        assert span_attrs["messaging.consumer.id"] == "worker-1"
         assert span_attrs["streaq.task.retry_count"] == 2
         assert span_attrs["streaq.task.timeout_ms"] == 5000
 
@@ -333,10 +329,10 @@ class TestAttributeKeyUniqueness:
     )
     def test_has_unique_keys(self, attr_class):
         """Each attribute class field maps to unique OTel key."""
-        mapping = attr_class._get_otel_map()
-        values = list(mapping.values())
+        pairs = attr_class._get_otel_pairs()
+        otel_keys = [key for _, key in pairs]
 
-        assert len(values) == len(set(values))
+        assert len(otel_keys) == len(set(otel_keys))
 
 
 class TestAttributeKeyConflict:
@@ -352,11 +348,12 @@ class TestAttributeKeyConflict:
     )
     def test_no_key_conflicts(self, class_a, class_b):
         """Attribute classes don't share same OTel keys for different meanings."""
-        mapping_a = class_a._get_otel_map()
-        mapping_b = class_b._get_otel_map()
+        pairs_a = class_a._get_otel_pairs()
+        pairs_b = class_b._get_otel_pairs()
+        keys_b = {key for _, key in pairs_b}
 
-        for key_a, otel_key in mapping_a.items():
-            if otel_key in mapping_b.values():
-                key_b = [k for k, v in mapping_b.items() if v == otel_key][0]
-                if key_a != key_b:
+        for field_a, otel_key in pairs_a:
+            if otel_key in keys_b:
+                field_b = next(f for f, k in pairs_b if k == otel_key)
+                if field_a != field_b:
                     pass
