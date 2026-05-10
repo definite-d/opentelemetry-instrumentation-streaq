@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datetime import timedelta
 from unittest.mock import Mock
 
 import pytest
@@ -255,3 +256,33 @@ class TestErrorHandling:
         assert result == "result"
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 0
+
+async def test_consumer_span_has_server_address(self, instrumentor, memory_exporter):
+        """Consumer span includes server.address and server.port when provided."""
+        mock_ctx = Mock()
+        mock_ctx.kwargs = {}
+        mock_ctx.priority = "normal"
+        mock_ctx.fn_name = "test_task"
+        mock_ctx.tries = 1
+        mock_ctx.task_id = "task-srv"
+        mock_ctx.timeout = None
+        mock_ctx.ttl = None
+
+        async def mock_task():
+            return "result"
+
+        await instrumentor._otel_task_handler(
+            mock_task,
+            mock_ctx,
+            {},
+            "worker-1",
+            server_address="redis-cluster.example.com",
+            server_port=6379,
+        )
+
+        spans = memory_exporter.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+
+        assert span.attributes["server.address"] == "redis-cluster.example.com"
+        assert span.attributes["server.port"] == 6379

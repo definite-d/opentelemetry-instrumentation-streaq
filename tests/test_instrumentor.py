@@ -14,6 +14,9 @@
 
 """Tests for StreaqInstrumentor unit tests."""
 
+from datetime import datetime, timedelta
+from unittest.mock import Mock
+
 from opentelemetry.trace import SpanKind
 
 from opentelemetry.instrumentation.streaq.utils import OTEL_METADATA_KEY
@@ -53,3 +56,50 @@ class TestProducerSpanCreation:
 
         assert OTEL_METADATA_KEY in mock_instance.kwargs
         assert "traceparent" in mock_instance.kwargs[OTEL_METADATA_KEY]
+
+class TestInitWrapper:
+    """Test _init_wrapper method."""
+
+    async def test_init_wrapper_stores_server_address_and_registers_middleware(self, instrumentor):
+        """_init_wrapper extracts server address and registers middleware."""
+        instance = Mock()
+        instance.id = "test-worker"
+        instance.middlewares = []
+
+        def fake_middleware(fn):
+            instance.middlewares.append(fn)
+            return fn
+
+        instance.middleware = fake_middleware
+
+        wrapped = Mock()
+        wrapped.return_value = None
+
+        instrumentor._init_wrapper(
+            wrapped, instance, (), {"redis_url": "valkey://redis-prod:6380/11"}
+        )
+
+        wrapped.assert_called_once()
+        assert instance._otel_server_address == "redis-prod"
+        assert instance._otel_server_port == 6380
+        assert len(instance.middlewares) == 1
+
+    async def test_init_wrapper_default_server_address(self, instrumentor):
+        """_init_wrapper defaults to localhost:6379."""
+        instance = Mock()
+        instance.id = "worker-default"
+        instance.middlewares = []
+
+        def fake_middleware(fn):
+            instance.middlewares.append(fn)
+            return fn
+
+        instance.middleware = fake_middleware
+
+        wrapped = Mock()
+        wrapped.return_value = None
+
+        instrumentor._init_wrapper(wrapped, instance, (), {})
+
+        assert instance._otel_server_address == "localhost"
+        assert instance._otel_server_port == 6379
