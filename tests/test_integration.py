@@ -93,7 +93,7 @@ class TestConsumerSpan:
         async def mock_task():
             return "result"
 
-        await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+        await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -118,7 +118,7 @@ class TestConsumerSpan:
             raise ValueError("Task failed!")
 
         with pytest.raises(ValueError):
-            await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+            await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -157,7 +157,7 @@ class TestConsumerSpan:
         async def mock_task():
             return "result"
 
-        await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+        await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -182,7 +182,7 @@ class TestConsumerSpan:
             raise ValueError("Task failed!")
 
         with pytest.raises(ValueError):
-            await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+            await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -207,7 +207,7 @@ class TestConsumerSpan:
         async def mock_task():
             return "result"
 
-        await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+        await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 1
@@ -250,7 +250,7 @@ class TestErrorHandling:
             return "result"
 
         instrumentor._tracer = None
-        result = await instrumentor._otel_task_handler(mock_task, mock_ctx, {})
+        result = await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
 
         assert result == "result"
         spans = memory_exporter.get_finished_spans()

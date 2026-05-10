@@ -216,6 +216,7 @@ class TestConsumerAttributes:
             message_id="task-123",
             operation_name="test_fn",
             retry_count=0,
+            consumer_id="worker-1",
         )
 
         assert attrs.operation_type == "process"
@@ -228,6 +229,7 @@ class TestConsumerAttributes:
             message_id="task-1",
             operation_name="task",
             retry_count=0,
+            consumer_id="worker-1",
         )
 
         assert attrs.timeout_ms is None
@@ -240,6 +242,7 @@ class TestConsumerAttributes:
             operation_name="handler_func",
             retry_count=2,
             timeout_ms=5000,
+            consumer_id="worker-1",
         )
 
         exporter = InMemorySpanExporter()
@@ -257,6 +260,7 @@ class TestConsumerAttributes:
         assert span_attrs["messaging.destination.name"] == "normal"
         assert span_attrs["messaging.message.id"] == "task-xyz"
         assert span_attrs["messaging.operation.name"] == "handler_func"
+        assert span_attrs["messaging.consumer.id"] == "worker-1"
         assert span_attrs["streaq.task.retry_count"] == 2
         assert span_attrs["streaq.task.timeout_ms"] == 5000
 
