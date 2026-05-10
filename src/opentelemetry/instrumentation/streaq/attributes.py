@@ -69,29 +69,29 @@ class BaseAttributes:
 class ProducerAttributes(BaseAttributes):
     """Producer span attributes for tasks enqueued via ``Task.enqueue()``."""
 
-    operation: Annotated[str, "messaging.operation"] = "publish"
-    """Always ``"publish"``."""
+    operation_type: Annotated[str, "messaging.operation.type"] = "send"
+    """The task enqueue operation. Always ``"send"``."""
 
     system: Annotated[str, "messaging.system"] = "redis"
-    """Messaging system backend (currently always redis)."""
+    """The messaging system backing streaQ. Currently always ``"redis"``."""
 
     destination: Annotated[str, "messaging.destination.name"]
-    """Queue name (in streaQ, priority is the queue name)."""
+    """The destination queue name. Maps from streaQ's priority queue parameter."""
 
-    task_id: Annotated[str, "streaq.task.id"]
-    """Unique task identifier."""
+    message_id: Annotated[str, "messaging.message.id"]
+    """Unique message identifier. Maps from ``streaq.task.id``."""
 
-    task_function: Annotated[str, "streaq.task.function"]
-    """Task function name."""
+    operation_name: Annotated[str, "messaging.operation.name"]
+    """The task function name. Maps from ``streaq.task.function``."""
 
     timeout_ms: Annotated[int | None, "streaq.task.timeout_ms"] = None
-    """Timeout in milliseconds."""
+    """Task timeout in milliseconds."""
 
     ttl_ms: Annotated[int | None, "streaq.task.ttl_ms"] = None
-    """TTL in milliseconds."""
+    """Result TTL in milliseconds."""
 
     scheduled_time: Annotated[str | None, "streaq.task.scheduled_time"] = None
-    """Scheduled execution time."""
+    """Scheduled execution time as ISO-8601 string."""
 
 
 @dataclass(kw_only=True)
@@ -103,26 +103,26 @@ class ConsumerAttributes(BaseAttributes):
     need to be set by the consumer middleware.
     """
 
-    operation: Annotated[str, "messaging.operation"] = "process"
-    """Always ``"process"``."""
+    operation_type: Annotated[str, "messaging.operation.type"] = "process"
+    """The task process operation. Always ``"process"``."""
 
     system: Annotated[str, "messaging.system"] = "redis"
-    """Messaging system backend (currently always redis)."""
+    """The messaging system backing streaQ. Currently always ``"redis"``."""
 
     destination: Annotated[str, "messaging.destination.name"]
-    """Queue name (in streaQ, priority is the queue name)."""
+    """The destination queue name. Maps from streaQ's priority queue parameter."""
 
-    task_id: Annotated[str, "streaq.task.id"]
-    """Task identifier (inherited from parent)."""
+    message_id: Annotated[str, "messaging.message.id"]
+    """Unique message identifier. Maps from ``streaq.task.id``, inherited from the producer span."""
 
-    task_function: Annotated[str, "streaq.task.function"]
-    """Task function name (inherited from parent)."""
+    operation_name: Annotated[str, "messaging.operation.name"]
+    """The task function name. Maps from ``streaq.task.function``, inherited from the producer span."""
 
     retry_count: Annotated[int, "streaq.task.retry_count"]
-    """Retry attempt number (TaskContext.tries)."""
+    """Current retry attempt for this task. Maps from ``TaskContext.tries``."""
 
     timeout_ms: Annotated[int | None, "streaq.task.timeout_ms"] = None
-    """Timeout in milliseconds (inherited from parent)."""
+    """Task timeout in milliseconds. Inherited from the producer span."""
 
 
 @dataclass(kw_only=True)
@@ -130,16 +130,16 @@ class CompletionAttributes(BaseAttributes):
     """Completion attributes added to consumer spans after task execution."""
 
     success: Annotated[bool, "streaq.task.success"]
-    """ Whether task succeeded."""
+    """Whether the task completed successfully."""
 
     execution_duration_ms: Annotated[int, "streaq.task.execution_duration_ms"]
-    """Duration in milliseconds."""
+    """Task execution wall-clock duration in milliseconds."""
 
     start_time: Annotated[str | None, "streaq.task.start_time"] = None
-    """Start timestamp."""
+    """ISO-8601 timestamp when task execution started."""
 
     finish_time: Annotated[str | None, "streaq.task.finish_time"] = None
-    """Finish timestamp."""
+    """ISO-8601 timestamp when task execution finished."""
 
     result_ttl: Annotated[int | None, "streaq.task.result_ttl"] = None
-    """Result TTL."""
+    """Result storage TTL in milliseconds."""
