@@ -354,9 +354,17 @@ class StreaqInstrumentor(BaseInstrumentor):
             start_time_iso = datetime.now(timezone.utc).isoformat()
 
             try:
+                from streaq.types import StreaqRetry
+            except ImportError:
+                StreaqRetry = None
+
+            try:
                 result = await task(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
                 return result
+            except StreaqRetry:
+                success = False
+                raise
             except Exception as exc:
                 success = False
                 span.set_status(Status(StatusCode.ERROR, str(exc)))
