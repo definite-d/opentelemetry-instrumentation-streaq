@@ -200,11 +200,10 @@ class StreaqInstrumentor(BaseInstrumentor):
 
         ProducerAttributes(
             destination=destination,
-            operation="publish",
             scheduled_time=scheduled_time,
             system="redis",
-            task_function=fn_name,
-            task_id=task_id,
+            operation_name=fn_name,
+            message_id=task_id,
             timeout_ms=timeout_ms,
             ttl_ms=ttl_ms,
         ).set(span)
@@ -300,11 +299,10 @@ class StreaqInstrumentor(BaseInstrumentor):
         ):
             ConsumerAttributes(
                 destination=destination,
-                operation="process",
                 retry_count=retry_count,
                 system="redis",
-                task_function=fn_name,
-                task_id=task_id,
+                operation_name=fn_name,
+                message_id=task_id,
                 timeout_ms=timeout_ms,
             ).set(span)
 
