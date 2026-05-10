@@ -43,7 +43,7 @@ class TestStreaqInstrumentation:
 
         span = spans[0]
         assert span.kind == SpanKind.PRODUCER
-        assert "publish" in span.name
+        assert "send" in span.name
         assert span.attributes["messaging.operation.type"] == "send"
         assert span.attributes["messaging.system"] == "redis"
         assert span.attributes["messaging.destination.name"] == "normal"

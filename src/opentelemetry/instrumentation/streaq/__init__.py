@@ -223,7 +223,7 @@ class StreaqInstrumentor(BaseInstrumentor):
         destination: str = getattr(task, "priority", None) or worker.priorities[-1]
 
         with self._tracer.start_as_current_span(
-            f"{destination} publish",
+            f"{destination} send",
             kind=SpanKind.PRODUCER,
         ) as span:
             # Inject trace context into task kwargs before serialization
