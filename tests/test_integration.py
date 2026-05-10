@@ -243,6 +243,57 @@ class TestConsumerSpan:
         assert "error.type" not in span.attributes
         assert span.attributes["streaq.task.success"] is False
 
+    async def test_completion_attributes_with_result_ttl(self, instrumentor, memory_exporter):
+        """result_ttl is set when ctx.ttl is non-None."""
+        mock_ctx = Mock()
+        mock_ctx.kwargs = {}
+        mock_ctx.priority = "normal"
+        mock_ctx.fn_name = "test_task"
+        mock_ctx.tries = 0
+        mock_ctx.task_id = "task-ttl"
+        mock_ctx.timeout = None
+        mock_ctx.ttl = timedelta(minutes=5)
+
+        async def mock_task():
+            return "result"
+
+        await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
+
+        spans = memory_exporter.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+
+        assert span.attributes["streaq.task.result_ttl"] == 300000
+
+    async def test_consumer_span_has_server_address(self, instrumentor, memory_exporter):
+        """Consumer span includes server.address and server.port when provided."""
+        mock_ctx = Mock()
+        mock_ctx.kwargs = {}
+        mock_ctx.priority = "normal"
+        mock_ctx.fn_name = "test_task"
+        mock_ctx.tries = 1
+        mock_ctx.task_id = "task-srv"
+        mock_ctx.timeout = None
+        mock_ctx.ttl = None
+
+        async def mock_task():
+            return "result"
+
+        await instrumentor._otel_task_handler(
+            mock_task,
+            mock_ctx,
+            {},
+            "worker-1",
+            server_address="redis-cluster.example.com",
+            server_port=6379,
+        )
+
+        spans = memory_exporter.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+
+        assert span.attributes["server.address"] == "redis-cluster.example.com"
+        assert span.attributes["server.port"] == 6379
 
 
 class TestContextPropagation:
@@ -283,33 +334,3 @@ class TestErrorHandling:
         assert result == "result"
         spans = memory_exporter.get_finished_spans()
         assert len(spans) == 0
-
-async def test_consumer_span_has_server_address(self, instrumentor, memory_exporter):
-        """Consumer span includes server.address and server.port when provided."""
-        mock_ctx = Mock()
-        mock_ctx.kwargs = {}
-        mock_ctx.priority = "normal"
-        mock_ctx.fn_name = "test_task"
-        mock_ctx.tries = 1
-        mock_ctx.task_id = "task-srv"
-        mock_ctx.timeout = None
-        mock_ctx.ttl = None
-
-        async def mock_task():
-            return "result"
-
-        await instrumentor._otel_task_handler(
-            mock_task,
-            mock_ctx,
-            {},
-            "worker-1",
-            server_address="redis-cluster.example.com",
-            server_port=6379,
-        )
-
-        spans = memory_exporter.get_finished_spans()
-        assert len(spans) == 1
-        span = spans[0]
-
-        assert span.attributes["server.address"] == "redis-cluster.example.com"
-        assert span.attributes["server.port"] == 6379
