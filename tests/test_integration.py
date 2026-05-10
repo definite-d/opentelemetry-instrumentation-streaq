@@ -217,6 +217,33 @@ class TestConsumerSpan:
         # tries=2 means 1 retry occurred, so retry_count should be 1
         assert span.attributes["streaq.task.retry_count"] == 1
 
+    async def test_middleware_handles_streaq_retry(self, instrumentor, memory_exporter):
+        """StreaqRetry doesn't set error.type (SDK auto-records exception event)."""
+        from streaq.types import StreaqRetry
+
+        mock_ctx = Mock()
+        mock_ctx.kwargs = {}
+        mock_ctx.priority = "normal"
+        mock_ctx.fn_name = "retry_task"
+        mock_ctx.tries = 1
+        mock_ctx.task_id = "task-retry"
+        mock_ctx.timeout = None
+        mock_ctx.ttl = None
+
+        async def mock_task():
+            raise StreaqRetry(delay=timedelta(seconds=1))
+
+        with pytest.raises(StreaqRetry):
+            await instrumentor._otel_task_handler(mock_task, mock_ctx, {}, "worker-1")
+
+        spans = memory_exporter.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+
+        assert "error.type" not in span.attributes
+        assert span.attributes["streaq.task.success"] is False
+
+
 
 class TestContextPropagation:
     """Test trace context propagation between producer and consumer."""
