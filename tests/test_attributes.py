@@ -82,36 +82,36 @@ class TestAttributeValueTypes:
 class TestBaseAttributes:
     """Test BaseAttributes class."""
 
-    def test_get_otel_map_returns_mapping(self):
-        """_get_otel_map returns field name to OTel key mapping."""
-        mapping = ProducerAttributes._get_otel_map()
+    def test_get_otel_pairs_returns_list(self):
+        """_get_otel_pairs returns list of (field, key) tuples."""
+        pairs = ProducerAttributes._get_otel_pairs()
 
-        assert isinstance(mapping, dict)
-        assert "operation" in mapping
-        assert "destination" in mapping
-        assert "task_id" in mapping
+        assert isinstance(pairs, list)
+        assert ("operation", "messaging.operation") in pairs
+        assert ("destination", "messaging.destination.name") in pairs
+        assert ("task_id", "streaq.task.id") in pairs
 
-    def test_get_otel_map_uses_metadata_key(self):
-        """_get_otel_map uses Annotated metadata as OTel key."""
-        mapping = ProducerAttributes._get_otel_map()
+    def test_get_otel_pairs_uses_metadata_key(self):
+        """_get_otel_pairs uses Annotated metadata as OTel key."""
+        pairs = ProducerAttributes._get_otel_pairs()
 
-        assert mapping["operation"] == "messaging.operation"
-        assert mapping["system"] == "messaging.system"
-        assert mapping["destination"] == "messaging.destination.name"
+        assert ("operation", "messaging.operation") in pairs
+        assert ("system", "messaging.system") in pairs
+        assert ("destination", "messaging.destination.name") in pairs
 
-    def test_get_otel_map_uses_field_name_without_metadata(self):
-        """_get_otel_map uses field name when no Annotated metadata."""
-        mapping = ProducerAttributes._get_otel_map()
+    def test_get_otel_pairs_uses_field_name_without_metadata(self):
+        """_get_otel_pairs uses field name when no Annotated metadata."""
+        pairs = ProducerAttributes._get_otel_pairs()
 
-        assert mapping["task_id"] == "streaq.task.id"
-        assert mapping["task_function"] == "streaq.task.function"
+        assert ("task_id", "streaq.task.id") in pairs
+        assert ("task_function", "streaq.task.function") in pairs
 
-    def test_get_otel_map_caches_result(self):
-        """_get_otel_map caches mapping for performance."""
-        mapping1 = ProducerAttributes._get_otel_map()
-        mapping2 = ProducerAttributes._get_otel_map()
+    def test_get_otel_pairs_caches_result(self):
+        """_get_otel_pairs caches pairs for performance."""
+        pairs1 = ProducerAttributes._get_otel_pairs()
+        pairs2 = ProducerAttributes._get_otel_pairs()
 
-        assert mapping1 is mapping2
+        assert pairs1 is pairs2
 
     def test_set_filters_none_values(self, fresh_tracer_provider):
         """set filters out None values before setting on span."""
@@ -333,10 +333,10 @@ class TestAttributeKeyUniqueness:
     )
     def test_has_unique_keys(self, attr_class):
         """Each attribute class field maps to unique OTel key."""
-        mapping = attr_class._get_otel_map()
-        values = list(mapping.values())
+        pairs = attr_class._get_otel_pairs()
+        otel_keys = [key for _, key in pairs]
 
-        assert len(values) == len(set(values))
+        assert len(otel_keys) == len(set(otel_keys))
 
 
 class TestAttributeKeyConflict:
@@ -352,11 +352,12 @@ class TestAttributeKeyConflict:
     )
     def test_no_key_conflicts(self, class_a, class_b):
         """Attribute classes don't share same OTel keys for different meanings."""
-        mapping_a = class_a._get_otel_map()
-        mapping_b = class_b._get_otel_map()
+        pairs_a = class_a._get_otel_pairs()
+        pairs_b = class_b._get_otel_pairs()
+        keys_b = {key for _, key in pairs_b}
 
-        for key_a, otel_key in mapping_a.items():
-            if otel_key in mapping_b.values():
-                key_b = [k for k, v in mapping_b.items() if v == otel_key][0]
-                if key_a != key_b:
+        for field_a, otel_key in pairs_a:
+            if otel_key in keys_b:
+                field_b = next(f for f, k in pairs_b if k == otel_key)
+                if field_a != field_b:
                     pass

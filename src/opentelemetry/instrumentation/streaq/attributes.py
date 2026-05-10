@@ -36,31 +36,30 @@ AttributeType = (
 class BaseAttributes:
     """Base class for span attributes."""
 
-    _key_cache: ClassVar[dict[type[BaseAttributes], dict[str, str]]] = {}
+    _pairs_cache: ClassVar[dict[type[BaseAttributes], list[tuple[str, str]]]] = {}
 
     @classmethod
-    def _get_otel_map(cls) -> dict[str, str]:
-        if cls not in cls._key_cache:
+    def _get_otel_pairs(cls) -> list[tuple[str, str]]:
+        if cls not in cls._pairs_cache:
             hints: dict[str, Any] = get_type_hints(cls, include_extras=True)
-            mapping: dict[str, str] = {}
+            pairs: list[tuple[str, str]] = []
             for f in fields(cls):
                 hint = hints.get(f.name)
                 if hasattr(hint, "__metadata__") and hint.__metadata__:
-                    mapping[f.name] = str(hint.__metadata__[0])
+                    pairs.append((f.name, str(hint.__metadata__[0])))
                 else:
-                    mapping[f.name] = f.name
-            cls._key_cache[cls] = mapping
-        return cls._key_cache[cls]
+                    pairs.append((f.name, f.name))
+            cls._pairs_cache[cls] = pairs
+        return cls._pairs_cache[cls]
 
     def set(self, span: Span) -> None:
         """Set non-None attributes on span."""
-        otel_map: dict[str, str] = self._get_otel_map()
         attrs: dict[str, AttributeType] = {}
 
-        for f in fields(self):
-            val: Any = getattr(self, f.name)
+        for field_name, otel_key in self._get_otel_pairs():
+            val: Any = getattr(self, field_name)
             if val is not None:
-                attrs[otel_map[f.name]] = val
+                attrs[otel_key] = val
 
         if attrs:
             span.set_attributes(attrs)
