@@ -90,6 +90,24 @@ class ProducerAttributes(BaseAttributes):
     ttl_ms: Annotated[int | None, "streaq.task.ttl_ms"] = None
     """Result TTL in milliseconds."""
 
+    max_retries: Annotated[int | None, "streaq.task.max_retries"] = None
+    """Maximum retry attempts. Maps from ``RegisteredTask.max_tries``."""
+
+    delay_ms: Annotated[int | None, "streaq.task.delay_ms"] = None
+    """Task delay in milliseconds."""
+
+    expire_ms: Annotated[int | None, "streaq.task.expire_ms"] = None
+    """Task expiration in milliseconds. Maps from ``RegisteredTask.expire``."""
+
+    unique: Annotated[bool | None, "streaq.task.unique"] = None
+    """Whether the task is unique. Maps from ``RegisteredTask.unique``."""
+
+    dependencies: Annotated[list[str] | None, "streaq.task.dependencies"] = None
+    """Dependency task IDs. Maps from ``task.after``."""
+
+    crontab: Annotated[str | None, "streaq.task.crontab"] = None
+    """Crontab schedule expression. Maps from ``task.schedule`` when it is a string."""
+
     scheduled_time: Annotated[str | None, "streaq.task.scheduled_time"] = None
     """Scheduled execution time as ISO-8601 string."""
 

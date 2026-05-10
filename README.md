@@ -130,8 +130,14 @@ These attributes are captured when tasks are enqueued:
 | `messaging.destination.name` | string   | The queue name (e.g., `"normal"`)      |
 | `messaging.message.id`       | string   | Unique message identifier              |
 | `messaging.operation.name`   | string   | Name of the task function              |
+| `streaq.task.max_retries`    | int      | Maximum retry attempts                 |
+| `streaq.task.delay_ms`       | int      | Task delay in milliseconds             |
 | `streaq.task.timeout_ms`     | int      | Task timeout in milliseconds           |
 | `streaq.task.ttl_ms`         | int      | Task TTL in milliseconds               |
+| `streaq.task.expire_ms`      | int      | Task expiration in milliseconds        |
+| `streaq.task.unique`         | boolean  | Whether task is unique                 |
+| `streaq.task.dependencies`   | string[] | Dependency task IDs                    |
+| `streaq.task.crontab`        | string   | Crontab schedule (if scheduled)        |
 | `streaq.task.scheduled_time` | string   | Scheduled execution time (if delayed)  |
 
 ### Consumer Span Attributes

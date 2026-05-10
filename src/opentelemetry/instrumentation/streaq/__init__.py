@@ -206,6 +206,12 @@ class StreaqInstrumentor(BaseInstrumentor):
             message_id=task_id,
             timeout_ms=timeout_ms,
             ttl_ms=ttl_ms,
+            max_retries=parent.max_tries,
+            delay_ms=self._to_ms(task.delay),
+            expire_ms=self._to_ms(parent.expire),
+            unique=parent.unique if hasattr(parent, "unique") else None,
+            dependencies=task.after or None,
+            crontab=task_schedule if isinstance(task_schedule, str) else None,
         ).set(span)
 
     async def _enqueue_wrapper(
