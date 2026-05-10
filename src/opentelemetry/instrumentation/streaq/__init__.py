@@ -251,11 +251,12 @@ class StreaqInstrumentor(BaseInstrumentor):
             inject(carrier)
             inject_metadata(task.kwargs, carrier)
 
+            # Set producer attributes before the actual enqueue
+            # so failed enqueues still carry attribute context
+            self._set_producer_attributes(span, task, destination, server_address, server_port)
+
             # Call the original _enqueue method
             result: Any = await wrapped(*args, **kwargs)
-
-            # Set producer attributes
-            self._set_producer_attributes(span, task, destination, server_address, server_port)
 
         return result
 
