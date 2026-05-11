@@ -111,6 +111,12 @@ class ProducerAttributes(BaseAttributes):
     scheduled_time: Annotated[str | None, "streaq.task.scheduled_time"] = None
     """Scheduled execution time as ISO-8601 string."""
 
+    server_address: Annotated[str | None, "server.address"] = None
+    """The Redis server address."""
+
+    server_port: Annotated[int | None, "server.port"] = None
+    """The Redis server port."""
+
 
 @dataclass(kw_only=True)
 class ConsumerAttributes(BaseAttributes):
@@ -144,6 +150,12 @@ class ConsumerAttributes(BaseAttributes):
 
     timeout_ms: Annotated[int | None, "streaq.task.timeout_ms"] = None
     """Task timeout in milliseconds. Inherited from the producer span."""
+
+    server_address: Annotated[str | None, "server.address"] = None
+    """The Redis server address."""
+
+    server_port: Annotated[int | None, "server.port"] = None
+    """The Redis server port."""
 
 
 @dataclass(kw_only=True)

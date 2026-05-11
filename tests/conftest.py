@@ -55,6 +55,8 @@ def mock_worker():
     worker.name = "test_worker"
     worker.id = "worker-1"
     worker._redis = None
+    worker._otel_server_address = None
+    worker._otel_server_port = None
     worker.priorities = ["normal"]
     worker.concurrency = 16
     worker.sync_concurrency = 16

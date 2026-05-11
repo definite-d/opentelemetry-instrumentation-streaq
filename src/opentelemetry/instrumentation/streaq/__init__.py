@@ -93,6 +93,7 @@ from contextlib import contextmanager
 from contextvars import Token
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 import wrapt
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
@@ -186,7 +187,14 @@ class StreaqInstrumentor(BaseInstrumentor):
             return int(val.total_seconds() * 1000)
         return int(float(val) * 1000)
 
-    def _set_producer_attributes(self, span: trace.Span, task: Any, destination: str) -> None:
+    def _set_producer_attributes(
+        self,
+        span: trace.Span,
+        task: Any,
+        destination: str,
+        server_address: str | None = None,
+        server_port: int | None = None,
+    ) -> None:
         parent: Any = task.parent
         scheduled_time: str | None = None
         task_id: str = str(task.id)
@@ -212,6 +220,8 @@ class StreaqInstrumentor(BaseInstrumentor):
             unique=parent.unique if hasattr(parent, "unique") else None,
             dependencies=task.after or None,
             crontab=task_schedule if isinstance(task_schedule, str) else None,
+            server_address=server_address,
+            server_port=server_port,
         ).set(span)
 
     async def _enqueue_wrapper(
@@ -227,6 +237,8 @@ class StreaqInstrumentor(BaseInstrumentor):
         task: Any = instance
         worker: Any = task.worker
         destination: str = getattr(task, "priority", None) or worker.priorities[-1]
+        server_address: str | None = getattr(worker, "_otel_server_address", None)
+        server_port: int | None = getattr(worker, "_otel_server_port", None)
 
         with self._tracer.start_as_current_span(
             f"{destination} send",
@@ -239,11 +251,12 @@ class StreaqInstrumentor(BaseInstrumentor):
             inject(carrier)
             inject_metadata(task.kwargs, carrier)
 
+            # Set producer attributes before the actual enqueue
+            # so failed enqueues still carry attribute context
+            self._set_producer_attributes(span, task, destination, server_address, server_port)
+
             # Call the original _enqueue method
             result: Any = await wrapped(*args, **kwargs)
-
-            # Set producer attributes
-            self._set_producer_attributes(span, task, destination)
 
         return result
 
@@ -254,8 +267,23 @@ class StreaqInstrumentor(BaseInstrumentor):
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
     ) -> Any:
+        redis_url: str | None = kwargs.get("redis_url")
+        if redis_url is None and args:
+            first_arg = args[0]
+            if isinstance(first_arg, str) and "://" in first_arg:
+                redis_url = first_arg
+        if redis_url is None:
+            redis_url = "redis://localhost:6379"
+
+        parsed = urlparse(redis_url)
+        server_address: str | None = parsed.hostname or "localhost"
+        server_port: int | None = parsed.port or 6379
+
         result = wrapped(*args, **kwargs)
         worker_id: str = instance.id
+
+        instance._otel_server_address = server_address
+        instance._otel_server_port = server_port
 
         try:
             from streaq.types import ReturnCoroutine, TaskContext, TaskDepends
@@ -269,7 +297,7 @@ class StreaqInstrumentor(BaseInstrumentor):
                 ) -> Any:
                     otel_ctx = extract_metadata(kwargs)
                     return await self._otel_task_handler(
-                        task, ctx, otel_ctx, worker_id, *args, **kwargs
+                        task, ctx, otel_ctx, worker_id, server_address, server_port, *args, **kwargs
                     )
 
                 return wrapper
@@ -284,6 +312,8 @@ class StreaqInstrumentor(BaseInstrumentor):
         ctx: Any,
         otel_ctx: dict[str, Any],
         worker_id: str,
+        server_address: str | None = None,
+        server_port: int | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> Any:
@@ -315,6 +345,8 @@ class StreaqInstrumentor(BaseInstrumentor):
                 message_id=task_id,
                 consumer_id=worker_id,
                 timeout_ms=timeout_ms,
+                server_address=server_address,
+                server_port=server_port,
             ).set(span)
 
             success: bool = True
@@ -322,9 +354,17 @@ class StreaqInstrumentor(BaseInstrumentor):
             start_time_iso = datetime.now(timezone.utc).isoformat()
 
             try:
+                from streaq.types import StreaqRetry
+            except ImportError:
+                StreaqRetry = None
+
+            try:
                 result = await task(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
                 return result
+            except StreaqRetry:
+                success = False
+                raise
             except Exception as exc:
                 success = False
                 span.set_status(Status(StatusCode.ERROR, str(exc)))
