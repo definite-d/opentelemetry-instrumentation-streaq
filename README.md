@@ -187,7 +187,6 @@ Enable streaQ instrumentation.
 **Parameters:**
 
 - `tracer_provider` (optional): Custom tracer provider. If not provided, uses the global provider.
-- `meter_provider` (optional): Custom meter provider for metrics (future).
 
 ##### `uninstrument()`
 
