@@ -20,13 +20,13 @@ OpenTelemetry instrumentation for [streaQ](https://github.com/tastyware/streaq),
 ## Installation
 
 ```bash
-pip install opentelemetry-instrumentation-streaq
+pip install git+https://github.com/definite-d/opentelemetry-instrumentation-streaq.git
 ```
 
 Or with the optional instruments dependency:
 
 ```bash
-pip install opentelemetry-instrumentation-streaq[instruments]
+pip install "opentelemetry-instrumentation-streaq[instruments] @ git+https://github.com/definite-d/opentelemetry-instrumentation-streaq.git"
 ```
 
 ### Requirements
